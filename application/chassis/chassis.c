@@ -69,7 +69,7 @@ void ChassisInit()
         .can_init_config.can_handle = &hcan1,
         .controller_param_init_config = {
             .speed_PID = {
-                .Kp = 5, // 4.5
+                .Kp = 10, // 4.5
                 .Ki = 1,  // 0
                 .Kd = 0,  // 0
                 .IntegralLimit = 3000,
@@ -95,20 +95,20 @@ void ChassisInit()
     };
     //  @todo: 当前还没有设置电机的正反转,仍然需要手动添加reference的正负号,需要电机module的支持,待修改.
     chassis_motor_config.can_init_config.tx_id = 1;
-    chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_REVERSE;
-    motor_rf = DJIMotorInit(&chassis_motor_config);    
+    chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL;
+    motor_lf = DJIMotorInit(&chassis_motor_config);    
 
     chassis_motor_config.can_init_config.tx_id = 2;
-    chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL;
-    motor_lf = DJIMotorInit(&chassis_motor_config);
+    chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_REVERSE;
+    motor_rf = DJIMotorInit(&chassis_motor_config);
 
     chassis_motor_config.can_init_config.tx_id = 3;
-    chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL;
-    motor_lb = DJIMotorInit(&chassis_motor_config);
-
-    chassis_motor_config.can_init_config.tx_id = 4;
     chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_REVERSE;
     motor_rb = DJIMotorInit(&chassis_motor_config);
+
+    chassis_motor_config.can_init_config.tx_id = 4;
+    chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL;
+    motor_lb = DJIMotorInit(&chassis_motor_config);
 
     referee_data = UITaskInit(&huart6,&ui_data); // 裁判系统初始化,会同时初始化UI
 
@@ -160,10 +160,10 @@ void ChassisInit()
  */
 static void MecanumCalculate()
 {
-    vt_rf = chassis_vy - chassis_vx + chassis_cmd_recv.wz * RF_CENTER;
-    vt_lf = chassis_vy + chassis_vx - chassis_cmd_recv.wz * LF_CENTER;
-    vt_lb = chassis_vy - chassis_vx - chassis_cmd_recv.wz * LB_CENTER;
-    vt_rb = chassis_vy + chassis_vx + chassis_cmd_recv.wz * RB_CENTER;
+    vt_lf =  chassis_vx - chassis_vy - chassis_cmd_recv.wz * LF_CENTER;
+    vt_rf =  chassis_vx + chassis_vy + chassis_cmd_recv.wz * RF_CENTER;
+    vt_lb =  chassis_vx + chassis_vy - chassis_cmd_recv.wz * LB_CENTER;
+    vt_rb =  chassis_vx - chassis_vy + chassis_cmd_recv.wz * RB_CENTER;
 }
 
 /**
@@ -229,10 +229,10 @@ void ChassisTask()
         chassis_cmd_recv.wz = 1.5f * chassis_cmd_recv.offset_angle * abs(chassis_cmd_recv.offset_angle);
         break;
     case CHASSIS_ROTATE: // 自旋,同时保持全向机动;当前wz维持定值,后续增加不规则的变速策略
-        chassis_cmd_recv.wz = 6000;
+        chassis_cmd_recv.wz = 2000;
         if ((chassis_cmd_recv.vx == 0) && (chassis_cmd_recv.vy == 0))
         {
-            chassis_cmd_recv.wz = 6000;
+            chassis_cmd_recv.wz = 2000;
         }
         break;
     default:
