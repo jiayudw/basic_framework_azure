@@ -92,6 +92,15 @@ typedef struct
     uint32_t crc_value;
 } 
 Vision_Send_s;
+
+typedef struct
+{
+	char sof;
+	float vx;
+	float vy;
+	uint32_t crc_value;
+} 
+Chassis_Send_s;
 #pragma pack()
 
 /**
@@ -106,6 +115,7 @@ Vision_Recv_s *VisionInit(UART_HandleTypeDef *_handle);
  *
  */
 void VisionSend();
+void ChassisSend();
 
 // /**
 //  * @brief 设置视觉发送标志位
@@ -127,6 +137,11 @@ void VisionSend();
 extern void get_protocol_send_data(
 							uint8_t *tx_buf,			 // 待发送的原始数据	
 							Vision_Send_s *tx_data			 // 待发送的数据
+							);	 // 待发送的数据帧长度
+
+extern void get_protocol_send_chassis_data(
+							uint8_t *tx_buf,			 // 待发送的chassis原始数据	
+							Chassis_Send_s *tx_data			 // 待发送的数据
 							);	 // 待发送的数据帧长度
 
 /*接收数据处理*/

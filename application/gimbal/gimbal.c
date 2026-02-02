@@ -17,7 +17,26 @@ static Gimbal_Ctrl_Cmd_s gimbal_cmd_recv;         // 来自cmd的控制信息
 static Subscriber_t *chassis_sub;     // 底盘裁判系统数据订阅者
 static Chassis_Upload_Data_s chassis_refe_data; // 底盘裁判系统数据
 static Vision_Send_s vision_send_data; // 云台视觉数据 
+// 专门用于 Ozone 调试的全局变量
+volatile float debug_speed_target = 0.0f;
+// YAW轴调试参数
+volatile float debug_yaw_angle_Kp = 30.0f;
+volatile float debug_yaw_angle_Ki = 0.2f;
+volatile float debug_yaw_angle_Kd = 0.5f;
 
+volatile float debug_yaw_speed_Kp = 50.0f;
+volatile float debug_yaw_speed_Ki = 200.0f;
+volatile float debug_yaw_speed_Kd = 0.0f;
+
+// PITCH轴调试参数
+volatile float debug_pitch_angle_Kp = 30.0f;
+volatile float debug_pitch_angle_Ki = 0.1f;
+volatile float debug_pitch_angle_Kd = 0.8f;
+
+volatile float debug_pitch_speed_Kp = 50.0f;
+volatile float debug_pitch_speed_Ki = 350.0f;
+volatile float debug_pitch_speed_Kd = 0.0f;
+//这我用来方便ozone调参数的，别动！
 void GimbalInit()
 {
     gimba_IMU_data = INS_Init(); // IMU先初始化,获取姿态数据指针赋给yaw电机的其他数据来源
@@ -25,11 +44,11 @@ void GimbalInit()
     Motor_Init_Config_s yaw_config = {
         .can_init_config = {
             .can_handle = &hcan1,
-            .tx_id = 1,
+            .tx_id = 5,
         },
         .controller_param_init_config = {
             .angle_PID = {
-                .Kp = 10, // 8
+                .Kp = 20, // 8
                 .Ki = 0.1,
                 .Kd = 0,
                 .DeadBand = 0.1,
@@ -62,11 +81,11 @@ void GimbalInit()
     Motor_Init_Config_s pitch_config = {
         .can_init_config = {
             .can_handle = &hcan2,
-            .tx_id = 1,
+            .tx_id = 2,
         },
         .controller_param_init_config = {
             .angle_PID = {
-                .Kp = 10, // 10
+                .Kp = 20, // 10
                 .Ki = 0,
                 .Kd = 0.5,
                 .Improve = PID_Trapezoid_Intergral | PID_Integral_Limit | PID_Derivative_On_Measurement,
@@ -106,7 +125,31 @@ void GimbalInit()
 
 /* 机器人云台控制核心任务,后续考虑只保留IMU控制,不再需要电机的反馈 */
 void GimbalTask()
-{
+{// ============================================
+    // 【新增】Ozone 实时调参覆盖逻辑
+    // ============================================
+    if (yaw_motor != NULL) {
+        // YAW 角度环
+        yaw_motor->motor_controller.angle_PID.Kp = debug_yaw_angle_Kp;
+        yaw_motor->motor_controller.angle_PID.Ki = debug_yaw_angle_Ki;
+        yaw_motor->motor_controller.angle_PID.Kd = debug_yaw_angle_Kd;
+        // YAW 速度环
+        yaw_motor->motor_controller.speed_PID.Kp = debug_yaw_speed_Kp;
+        yaw_motor->motor_controller.speed_PID.Ki = debug_yaw_speed_Ki;
+        yaw_motor->motor_controller.speed_PID.Kd = debug_yaw_speed_Kd;
+    }
+
+    if (pitch_motor != NULL) {
+        // PITCH 角度环
+        pitch_motor->motor_controller.angle_PID.Kp = debug_pitch_angle_Kp;
+        pitch_motor->motor_controller.angle_PID.Ki = debug_pitch_angle_Ki;
+        pitch_motor->motor_controller.angle_PID.Kd = debug_pitch_angle_Kd;
+        // PITCH 速度环
+        pitch_motor->motor_controller.speed_PID.Kp = debug_pitch_speed_Kp;
+        pitch_motor->motor_controller.speed_PID.Ki = debug_pitch_speed_Ki;
+        pitch_motor->motor_controller.speed_PID.Kd = debug_pitch_speed_Kd;
+    }
+    // ============================================
     // 获取云台控制数据
     // 后续增加未收到数据的处理
     SubGetMessage(gimbal_sub, &gimbal_cmd_recv);
@@ -118,7 +161,7 @@ void GimbalTask()
     // 停止
     case GIMBAL_ZERO_FORCE:
         DJIMotorStop(yaw_motor);
-        DJIMotorStop(pitch_motor);
+        DJIMotorStop(pitch_motor);  
         break;
     // 使用陀螺仪的反馈,底盘根据yaw电机的offset跟随云台或视觉模式采用
     case GIMBAL_GYRO_MODE: // 后续只保留此模式
@@ -134,6 +177,7 @@ void GimbalTask()
     // 云台自由模式,使用编码器反馈,底盘和云台分离,仅云台旋转,一般用于调整云台姿态(英雄吊射等)/能量机关
     case GIMBAL_FREE_MODE: // 后续删除,或加入云台追地盘的跟随模式(响应速度更快)
         DJIMotorEnable(yaw_motor);
+        
         DJIMotorEnable(pitch_motor);
         DJIMotorChangeFeed(yaw_motor, ANGLE_LOOP, OTHER_FEED);
         DJIMotorChangeFeed(yaw_motor, SPEED_LOOP, OTHER_FEED);
@@ -157,6 +201,8 @@ void GimbalTask()
     vision_send_data.fire_times = 0;
     vision_send_data.present_pitch = gimbal_feedback_data.gimbal_imu_data.Pitch;
     vision_send_data.present_yaw = gimbal_feedback_data.gimbal_imu_data.Yaw;   
+    // vision_send_data.present_pitch = chassis_refe_data.speed_vx;
+    // vision_send_data.present_yaw = chassis_refe_data.speed_vy;   
     vision_send_data.reserved_slot = chassis_refe_data.robot_HP;
     VisionSend(&vision_send_data);
     // 推送消息

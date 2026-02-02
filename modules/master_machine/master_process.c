@@ -88,6 +88,30 @@ void get_protocol_send_data(
     p32 = (uint32_t*)&tx_buf[12];
     *p32 = crc_val;
 }
+void get_protocol_send_chassis_data(
+                            uint8_t *tx_buf,         // 待发送的数据帧
+                            Chassis_Send_s *tx_data          // 待发送的float数据
+                
+                            )    // 待发送的数据帧长度
+{
+    float *pf;
+    int8_t *pi8;
+    int16_t *pi16;
+    uint32_t *p32;
+    uint32_t crc_val;
+    tx_buf[0] = tx_data->sof;
+    pf = (float*)&tx_buf[1];
+    *pf = tx_data->vx;
+
+    pf = (float*)&tx_buf[5];
+    *pf = tx_data->vy;
+
+    p32 = (uint32_t*)&tx_buf[0];
+    crc_val=HAL_CRC_Calculate(&hcrc,p32,3);
+
+    p32 = (uint32_t*)&tx_buf[9];
+    *p32 = crc_val;
+}
 /*
     此函数用于处理接收数据，
     返回数据内容的id
@@ -233,6 +257,16 @@ void VisionSend(Vision_Send_s *tx_data)  // ← 添加參數
     
     // 發送固定長度
     USBTransmit(send_buff, sizeof(Vision_Send_s));  // ← 固定長度
+}
+void ChassisSend(Chassis_Send_s *tx_data)  // ← 添加參數
+{
+    static uint8_t send_buff[VISION_SEND_SIZE];
+    
+    // 使用新版打包函數
+    get_protocol_send_chassis_data(send_buff, tx_data);  // ← 只需要兩個參數
+    
+    // 發送固定長度
+    USBTransmit(send_buff, sizeof(Chassis_Send_s));  // ← 固定長度
 }
 
 #endif // VISION_USE_VCP

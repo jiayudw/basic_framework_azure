@@ -47,6 +47,7 @@ static Subscriber_t *chassis_sub;                   // 用于订阅底盘的控�
 #endif                                              // !ONE_BOARD
 static Chassis_Ctrl_Cmd_s chassis_cmd_recv;         // 底盘接收到的控制命令
 static Chassis_Upload_Data_s chassis_feedback_data; // 底盘回传的反馈数据
+static Chassis_Send_s chassis_send_data;               // 发送给视觉的底盘数据
 
 static referee_info_t* referee_data; // 用于获取裁判系统的数据
 static Referee_Interactive_info_t ui_data; // UI数据，将底盘中的数据传入此结构体的对应变量中，UI会自动检测是否变化，对应显示UI
@@ -69,7 +70,7 @@ void ChassisInit()
         .can_init_config.can_handle = &hcan1,
         .controller_param_init_config = {
             .speed_PID = {
-                .Kp = 5, // 4.5
+                .Kp = 10, // 4.5
                 .Ki = 1,  // 0
                 .Kd = 0,  // 0
                 .IntegralLimit = 3000,
@@ -95,20 +96,20 @@ void ChassisInit()
     };
     //  @todo: 当前还没有设置电机的正反转,仍然需要手动添加reference的正负号,需要电机module的支持,待修改.
     chassis_motor_config.can_init_config.tx_id = 1;
-    chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_REVERSE;
-    motor_rf = DJIMotorInit(&chassis_motor_config);    
+    chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL;
+    motor_lf = DJIMotorInit(&chassis_motor_config);    
 
     chassis_motor_config.can_init_config.tx_id = 2;
-    chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL;
-    motor_lf = DJIMotorInit(&chassis_motor_config);
+    chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_REVERSE;
+    motor_rf = DJIMotorInit(&chassis_motor_config);
 
     chassis_motor_config.can_init_config.tx_id = 3;
-    chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL;
-    motor_lb = DJIMotorInit(&chassis_motor_config);
-
-    chassis_motor_config.can_init_config.tx_id = 4;
     chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_REVERSE;
     motor_rb = DJIMotorInit(&chassis_motor_config);
+
+    chassis_motor_config.can_init_config.tx_id = 4;
+    chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL;
+    motor_lb = DJIMotorInit(&chassis_motor_config);
 
     referee_data = UITaskInit(&huart6,&ui_data); // 裁判系统初始化,会同时初始化UI
 
@@ -160,10 +161,10 @@ void ChassisInit()
  */
 static void MecanumCalculate()
 {
-    vt_rf = chassis_vy - chassis_vx + chassis_cmd_recv.wz * RF_CENTER;
-    vt_lf = chassis_vy + chassis_vx - chassis_cmd_recv.wz * LF_CENTER;
-    vt_lb = chassis_vy - chassis_vx - chassis_cmd_recv.wz * LB_CENTER;
-    vt_rb = chassis_vy + chassis_vx + chassis_cmd_recv.wz * RB_CENTER;
+    vt_lf =  chassis_vx - chassis_vy - chassis_cmd_recv.wz * LF_CENTER;
+    vt_rf =  chassis_vx + chassis_vy + chassis_cmd_recv.wz * RF_CENTER;
+    vt_lb =  chassis_vx + chassis_vy - chassis_cmd_recv.wz * LB_CENTER;
+    vt_rb =  chassis_vx - chassis_vy + chassis_cmd_recv.wz * RB_CENTER;
 }
 
 /**
@@ -189,6 +190,26 @@ static void EstimateSpeed()
     // 根据电机速度和陀螺仪的角速度进行解算,还可以利用加速度计判断是否打滑(如果有)
     // chassis_feedback_data.vx vy wz =
     //  ...
+
+    float wheel_speed_lf_dps = motor_lf->measure.speed_aps;
+    float wheel_speed_rf_dps = motor_rf->measure.speed_aps;
+    float wheel_speed_lb_dps = motor_lb->measure.speed_aps;
+    float wheel_speed_rb_dps = motor_rb->measure.speed_aps;
+    //逆运动学解算
+    float dps_to_mps = (PERIMETER_WHEEL / REDUCTION_RATIO_WHEEL) / 360.0f;
+    //转换为轮子线速度 
+    float v_lf = wheel_speed_lf_dps * dps_to_mps;
+    float v_rf = wheel_speed_rf_dps * dps_to_mps;
+    float v_lb = wheel_speed_lb_dps * dps_to_mps;
+    float v_rb = wheel_speed_rb_dps * dps_to_mps;
+
+    float vx = ( -v_lf - v_lb + v_rf + v_rb) / 4.0f;  // X方向速度（前后）
+    float vy = ( v_lf - v_lb + v_rf - v_rb) / 4.0f;  // Y方向速度（左右）
+    //float vy = (v_lf + v_rf + v_lb + v_rb) / 4.0f;
+    //float vx = (v_lf - v_rf - v_lb + v_rb) / 4.0f;
+
+    chassis_feedback_data.speed_vx = vx;
+    chassis_feedback_data.speed_vy = -vy;
 }
 
 /* 机器人底盘控制核心任务 */
@@ -229,10 +250,10 @@ void ChassisTask()
         chassis_cmd_recv.wz = 1.5f * chassis_cmd_recv.offset_angle * abs(chassis_cmd_recv.offset_angle);
         break;
     case CHASSIS_ROTATE: // 自旋,同时保持全向机动;当前wz维持定值,后续增加不规则的变速策略
-        chassis_cmd_recv.wz = 6000;
+        chassis_cmd_recv.wz = 2000;
         if ((chassis_cmd_recv.vx == 0) && (chassis_cmd_recv.vy == 0))
         {
-            chassis_cmd_recv.wz = 6000;
+            chassis_cmd_recv.wz = 2000;
         }
         break;
     default:
@@ -274,9 +295,13 @@ void ChassisTask()
     //添加弹速反馈
     chassis_feedback_data.initial_speed = referee_data->ShootData.initial_speed;
     //添加底盘速度控制指令反馈代码
-    chassis_feedback_data.speed_vx = chassis_cmd_recv.vx;
-    chassis_feedback_data.speed_vy = chassis_cmd_recv.vy;
-    chassis_feedback_data.speed_wz = chassis_cmd_recv.wz;
+    // chassis_feedback_data.speed_vx = chassis_cmd_recv.vx;
+    // chassis_feedback_data.speed_vy = chassis_cmd_recv.vy;
+    // chassis_feedback_data.speed_wz = chassis_cmd_recv.wz;
+    chassis_send_data.sof = 'C';
+    chassis_send_data.vx = chassis_feedback_data.speed_vx;   
+    chassis_send_data.vy = chassis_feedback_data.speed_vy;
+    ChassisSend(&chassis_send_data);
 
     PubPushMessage(chassis_pub, (void *)&chassis_feedback_data);
     // 根据裁判系统的反馈数据和电容数据对输出限幅并设定闭环参考值

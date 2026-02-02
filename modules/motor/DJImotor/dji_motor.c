@@ -312,7 +312,7 @@ void DJIMotorControl()
 
         // 若该电机处于停止状态,直接将buff置零
         if (motor->stop_flag == MOTOR_STOP)
-            memset(sender_assignment[group].tx_buff + 2 * num, 0, 16u);
+            memset(sender_assignment[group].tx_buff + 2 * num, 0, 2u);
     }
 
     // 遍历flag,检查是否要发送这一帧报文
@@ -382,32 +382,32 @@ void DJIMotorControl()
 
                     
                 // }
-
+//为什么？？？？？
                 // 原功率控制方案
-                if (chassis_motor_feedback.buffer_energy < 60)
-                {
-                    if (chassis_motor_feedback.buffer_energy < 30)
-                    {
-                        if (chassis_motor_feedback.buffer_energy < 10)
-                        {
-                            motor1rf_set = (int16_t)((float)motor1rf_set*0.2);
-                            motor2lf_set = (int16_t)((float)motor2lf_set*0.2);
-                            motor3lb_set = (int16_t)((float)motor3lb_set*0.2);
-                            motor4rb_set = (int16_t)((float)motor4rb_set*0.2);
-                        }else{
-                            motor1rf_set = (int16_t)((float)motor1rf_set*0.4);
-                            motor2lf_set = (int16_t)((float)motor2lf_set*0.4);
-                            motor3lb_set = (int16_t)((float)motor3lb_set*0.4);
-                            motor4rb_set = (int16_t)((float)motor4rb_set*0.4);
-                        }
+                // if (chassis_motor_feedback.buffer_energy < 60)
+                // {
+                //     if (chassis_motor_feedback.buffer_energy < 30)
+                //     {
+                //         if (chassis_motor_feedback.buffer_energy < 10)
+                //         {
+                //             motor1rf_set = (int16_t)((float)motor1rf_set*0.2);
+                //             motor2lf_set = (int16_t)((float)motor2lf_set*0.2);
+                //             motor3lb_set = (int16_t)((float)motor3lb_set*0.2);
+                //             motor4rb_set = (int16_t)((float)motor4rb_set*0.2);
+                //         }else{
+                //             motor1rf_set = (int16_t)((float)motor1rf_set*0.4);
+                //             motor2lf_set = (int16_t)((float)motor2lf_set*0.4);
+                //             motor3lb_set = (int16_t)((float)motor3lb_set*0.4);
+                //             motor4rb_set = (int16_t)((float)motor4rb_set*0.4);
+                //         }
                         
-                    }else{
-                        motor1rf_set = (int16_t)((float)motor1rf_set*0.6);
-                        motor2lf_set = (int16_t)((float)motor2lf_set*0.6);
-                        motor3lb_set = (int16_t)((float)motor3lb_set*0.6);
-                        motor4rb_set = (int16_t)((float)motor4rb_set*0.6);
-                    }
-                }
+                //     }else{
+                //         motor1rf_set = (int16_t)((float)motor1rf_set*0.6);
+                //         motor2lf_set = (int16_t)((float)motor2lf_set*0.6);
+                //         motor3lb_set = (int16_t)((float)motor3lb_set*0.6);
+                //         motor4rb_set = (int16_t)((float)motor4rb_set*0.6);
+                //     }
+                // }
                 // float power_measure = chassis_power;
                 // float power_target = chassis_motor_feedback.chassis_power_limit;
                 // RTT_PrintWave_np(2,power_measure,power_target); //非指针参数打印波形
