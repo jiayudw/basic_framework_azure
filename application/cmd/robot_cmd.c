@@ -74,9 +74,9 @@ void RobotCMDInit()
     cmd_can_comm = CANCommInit(&comm_conf);
 #endif // GIMBAL_BOARD
     gimbal_cmd_send.pitch = 0;
-    vision_recv_data->ACTION_DATA.abs_pitch = 0;
-    vision_recv_data->ACTION_DATA.abs_yaw = 0;
-    vision_recv_data->ACTION_DATA.fire_times = 0;
+    vision_recv_data->ACTION_DATA.pitch = 0;
+    vision_recv_data->ACTION_DATA.yaw = 0;
+    // vision_recv_data->ACTION_DATA.fire_times = 0;
     shoot_cmd_send.shoot_mode = SHOOT_OFF;
     shoot_cmd_send.load_mode = LOAD_STOP;
     shoot_cmd_send.lid_mode = LID_CLOSE;
@@ -191,39 +191,40 @@ static void RemoteControlSet()
         gimbal_cmd_send.gimbal_mode = GIMBAL_GYRO_MODE;
     }
     // 左侧开关状态为[下],遥控器控制下启动视觉调试
+    //后续启动视觉，先到当前位置，如果识别到才瞄准
     if (switch_is_down(rc_data[TEMP].rc.switch_left))
     {
-        gimbal_cmd_send.yaw = vision_recv_data->ACTION_DATA.abs_yaw;
-        gimbal_cmd_send.pitch =vision_recv_data->ACTION_DATA.abs_pitch;
-        shoot_cmd_send.shoot_num = vision_recv_data->ACTION_DATA.fire_times;
-        if (shoot_cmd_send.shoot_num == 1)
-        {
-            shoot_cmd_send.load_mode = LOAD_VISION;
-        }else if (shoot_cmd_send.shoot_num == 0)
-        {
-            shoot_cmd_send.load_mode = LOAD_STOP;
-        }
+        gimbal_cmd_send.yaw = vision_recv_data->ACTION_DATA.yaw;
+        gimbal_cmd_send.pitch =vision_recv_data->ACTION_DATA.pitch;
+        // shoot_cmd_send.shoot_num = vision_recv_data->ACTION_DATA.fire_times;
+        // if (shoot_cmd_send.shoot_num == 1)
+        // {
+        //     shoot_cmd_send.load_mode = LOAD_VISION;
+        // }else if (shoot_cmd_send.shoot_num == 0)
+        // {
+        //     shoot_cmd_send.load_mode = LOAD_STOP;
+        // }
         
-        if (vision_recv_data->ACTION_DATA.reserved_slot / 10 == 2)
-        {
-            shoot_cmd_send.load_mode = LOAD_REVERSE;
-            shoot_cmd_send.shoot_rate = 4;
-            shoot_cmd_send.shoot_num = 0;
-        }
+        // if (vision_recv_data->ACTION_DATA.reserved_slot / 10 == 2)
+        // {
+        //     shoot_cmd_send.load_mode = LOAD_REVERSE;
+        //     shoot_cmd_send.shoot_rate = 4;
+        //     shoot_cmd_send.shoot_num = 0;
+        // }
 
-        if (vision_recv_data->ACTION_DATA.reserved_slot % 10 == 2)
-        {
-            chassis_cmd_send.vy = 0;
-             chassis_cmd_send.wz = 0;
-        }else if (vision_recv_data->ACTION_DATA.reserved_slot % 10 == 0)
-        {
-            chassis_cmd_send.vy = 0;
-            chassis_cmd_send.wz = 0;
-        }else if (vision_recv_data->ACTION_DATA.reserved_slot % 10 == 1)
-        {
-            chassis_cmd_send.vy = -0;
-            chassis_cmd_send.wz = 0;
-        }
+        // if (vision_recv_data->ACTION_DATA.reserved_slot % 10 == 2)
+        // {
+        //     chassis_cmd_send.vy = 0;
+        //      chassis_cmd_send.wz = 0;
+        // }else if (vision_recv_data->ACTION_DATA.reserved_slot % 10 == 0)
+        // {
+        //     chassis_cmd_send.vy = 0;
+        //     chassis_cmd_send.wz = 0;
+        // }else if (vision_recv_data->ACTION_DATA.reserved_slot % 10 == 1)
+        // {
+        //     chassis_cmd_send.vy = -0;
+        //     chassis_cmd_send.wz = 0;
+        // }
     } else {
         gimbal_cmd_send.yaw -= 0.003f * (float)rc_data[TEMP].rc.rocker_l_;
         gimbal_cmd_send.pitch += 0.001f * (float)rc_data[TEMP].rc.rocker_l1;

@@ -16,8 +16,8 @@
 #include "crc.h"
 #include "bsp_dwt.h"
 
-static Vision_Recv_s recv_data;
-static Vision_Send_s send_data;
+Vision_Recv_s recv_data;
+// static Vision_Send_s send_data;
 static DaemonInstance *vision_daemon_instance;
 static USARTInstance *vision_usart_instance;
 // void VisionSetFlag(Enemy_Color_e enemy_color, Work_Mode_e work_mode, Bullet_Speed_e bullet_speed)
@@ -37,21 +37,21 @@ static USARTInstance *vision_usart_instance;
 //硬件crc32校验
 CRC_STATE check_data4_crc32(uint8_t *pbuffer,uint8_t length_4multi)
 {
-    uint32_t *p32;
-    uint32_t crc_cal = 0;
+    // uint32_t *p32;
+    // uint32_t crc_cal = 0;
     
-    p32 = (uint32_t*)&pbuffer[0];
-    crc_cal = HAL_CRC_Calculate(&hcrc,p32,(uint32_t)(length_4multi/4-1));
+    // p32 = (uint32_t*)&pbuffer[0];
+    // crc_cal = HAL_CRC_Calculate(&hcrc,p32,(uint32_t)(length_4multi/4-1));
 
-    p32 = (uint32_t*)&pbuffer[length_4multi-4];
-    if (*p32 == crc_cal)
-    {
-      return CRC_RIGHT;
-    }
-    else
-    {
-      return CRC_WRONG;
-    }
+    // p32 = (uint32_t*)&pbuffer[length_4multi-4];
+    // if (*p32 == crc_cal)
+    // {
+    //   return CRC_RIGHT;
+    // }
+    // else
+    // {
+    //   return CRC_WRONG;
+    // }
 }
 
 /*
@@ -64,29 +64,45 @@ void get_protocol_send_data(
                 
                             )    // 待发送的数据帧长度
 {
-    float *pf;
-    int8_t *pi8;
-    int16_t *pi16;
-    uint32_t *p32;
-    uint32_t crc_val;
-    tx_buf[0] = tx_data->sof;
-    pi8 = (int8_t*)&tx_buf[1];
-    *pi8 = tx_data->fire_times;
+    // float *pf;
+    // int8_t *pi8;
+    // int16_t *pi16;
+    // uint32_t *p32;
+    // uint32_t crc_val;
+    // tx_buf[0] = tx_data->sof;
+    // pi8 = (int8_t*)&tx_buf[1];
+    // *pi8 = tx_data->fire_times;
 
-    pf = (float*)&tx_buf[2];
-    *pf = tx_data->present_pitch;
+    // pf = (float*)&tx_buf[2];
+    // *pf = tx_data->present_pitch;
 
-    pf = (float*)&tx_buf[6];
-    *pf = tx_data->present_yaw;
+    // pf = (float*)&tx_buf[6];
+    // *pf = tx_data->present_yaw;
 
-    pi16 = (int16_t*)&tx_buf[10];
-    *pi16 = tx_data->reserved_slot;
+    // pi16 = (int16_t*)&tx_buf[10];
+    // *pi16 = tx_data->reserved_slot;
 
-    p32 = (uint32_t*)&tx_buf[0];
-    crc_val=HAL_CRC_Calculate(&hcrc,p32,3);
+    // p32 = (uint32_t*)&tx_buf[0];
+    // crc_val=HAL_CRC_Calculate(&hcrc,p32,3);
 
-    p32 = (uint32_t*)&tx_buf[12];
-    *p32 = crc_val;
+    // p32 = (uint32_t*)&tx_buf[12];
+    // *p32 = crc_val;
+    // 1. 帧头
+    tx_buf[0] = 0xFF; 
+
+    // 2. 模式 Mode [1]
+    tx_buf[1] = tx_data->mode;
+
+    // 3. 数据段 (Roll, Pitch, Yaw)
+    // 使用 memcpy 防止字节对齐问题，比直接指针转换更安全
+    memcpy(&tx_buf[2],  &tx_data->roll,  4); // [2-5]
+    memcpy(&tx_buf[6],  &tx_data->pitch, 4); // [6-9]
+    memcpy(&tx_buf[10], &tx_data->yaw,   4); // [10-13]
+
+    // 4. 帧尾/校验
+    // 上位机没明确 CRC 算法，暂时填 0 或者固定值，防止数组越界
+    tx_buf[14] = 0;
+    tx_buf[15] = 0x0D;
 }
 /*
     此函数用于处理接收数据，
@@ -94,22 +110,39 @@ void get_protocol_send_data(
 */
 void get_protocol_info(uint8_t *rx_buf, Vision_Recv_s *rx_data)         // 接收的float数据存储地址
 {
-    if (rx_buf[0] == 'A')
-    {
-        if(check_data4_crc32(rx_buf,ACTION_DATA_LENGTH) == CRC_WRONG)
-        {
-            return;
-        }
-        else
-        {
-            rx_data->ACTION_DATA.sof = rx_buf[0];
-            rx_data->ACTION_DATA.fire_times = rx_buf[1];
-            rx_data->ACTION_DATA.abs_pitch = *((float*) &rx_buf[2]);
-            rx_data->ACTION_DATA.abs_yaw = *((float*) &rx_buf[6]);
-            rx_data->ACTION_DATA.reserved_slot = *((int16_t*) &rx_buf[10]);
-            rx_data->ACTION_DATA.crc_check = *((uint32_t*) &rx_buf[12]);
-        }
+    // if (rx_buf[0] == 'A')
+    // {
+    //     if(check_data4_crc32(rx_buf,ACTION_DATA_LENGTH) == CRC_WRONG)
+    //     {
+    //         return;
+    //     }
+    //     else
+    //     {
+    //         rx_data->ACTION_DATA.sof = rx_buf[0];
+    //         rx_data->ACTION_DATA.fire_times = rx_buf[1];
+    //         rx_data->ACTION_DATA.abs_pitch = *((float*) &rx_buf[2]);
+    //         rx_data->ACTION_DATA.abs_yaw = *((float*) &rx_buf[6]);
+    //         rx_data->ACTION_DATA.reserved_slot = *((int16_t*) &rx_buf[10]);
+    //         rx_data->ACTION_DATA.crc_check = *((uint32_t*) &rx_buf[12]);
+    //     }
+    // }
+// 1. 严格检查帧头 (0xFF)
+    if (rx_buf[0] != 0xFF) {
+        return; // 帧头不对，直接丢弃，防止错位解析
     }
+    if (rx_buf[15] != 0x0D) {
+        return; // 帧尾不对，说明数据可能损坏或长度错位
+    }
+    // 直接解析，无需 CRC32 (除非你确定上位机发了 CRC)
+    rx_data->ACTION_DATA.sof = rx_buf[0];
+    
+    // [1] 开火建议
+    rx_data->ACTION_DATA.fire_advice = rx_buf[1];
+
+    // [2-13] 浮点数据
+    memcpy(&rx_data->ACTION_DATA.pitch,    &rx_buf[2],  4);
+    memcpy(&rx_data->ACTION_DATA.yaw,      &rx_buf[6],  4);
+    memcpy(&rx_data->ACTION_DATA.distance, &rx_buf[10], 4);
 }
 
 
@@ -184,7 +217,7 @@ void VisionSend(Vision_Send_s *tx_data)
     // flag_register = 30 << 8 | 0b00000001;
     // 将数据转化为seasky协议的数据包
     get_protocol_send_data(send_buff, tx_data);
-    USARTSend(vision_usart_instance, send_buff, sizeof(Vision_Send_s), USART_TRANSFER_DMA); // 和视觉通信使用IT,防止和接收使用的DMA冲突
+    USARTSend(vision_usart_instance, send_buff, VISION_SEND_SIZE, USART_TRANSFER_DMA); // 和视觉通信使用IT,防止和接收使用的DMA冲突
     // 此处为HAL设计的缺陷,DMASTOP会停止发送和接收,导致再也无法进入接收中断.
     // 也可在发送完成中断中重新启动DMA接收,但较为复杂.因此,此处使用IT发送.
     // 若使用了daemon,则也可以使用DMA发送.
@@ -232,7 +265,7 @@ void VisionSend(Vision_Send_s *tx_data)  // ← 添加參數
     get_protocol_send_data(send_buff, tx_data);  // ← 只需要兩個參數
     
     // 發送固定長度
-    USBTransmit(send_buff, sizeof(Vision_Send_s));  // ← 固定長度
+    USBTransmit(send_buff, 16);  // ← 固定長度
 }
 
 #endif // VISION_USE_VCP

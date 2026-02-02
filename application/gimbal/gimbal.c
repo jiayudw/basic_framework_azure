@@ -198,10 +198,11 @@ void GimbalTask()
     gimbal_feedback_data.gimbal_imu_data = *gimba_IMU_data;
     gimbal_feedback_data.yaw_motor_single_round_angle = yaw_motor->measure.angle_single_round;
     vision_send_data.sof = 'P';
-    vision_send_data.fire_times = 0;
-    vision_send_data.present_pitch = gimbal_feedback_data.gimbal_imu_data.Pitch;
-    vision_send_data.present_yaw = gimbal_feedback_data.gimbal_imu_data.Yaw;   
-    vision_send_data.reserved_slot = chassis_refe_data.robot_HP;
+    vision_send_data.mode = 0;
+    vision_send_data.roll  = gimbal_feedback_data.gimbal_imu_data.Roll;
+    vision_send_data.pitch = gimbal_feedback_data.gimbal_imu_data.Pitch;
+    vision_send_data.yaw = gimbal_feedback_data.gimbal_imu_data.Yaw;   
+    // vision_send_data.reserved_slot = chassis_refe_data.robot_HP;
     VisionSend(&vision_send_data);
     // 推送消息
     PubPushMessage(gimbal_pub, (void *)&gimbal_feedback_data);
