@@ -100,8 +100,13 @@ void get_protocol_send_data(
     memcpy(&tx_buf[10], &tx_data->yaw,   4); // [10-13]
 
     // 4. 帧尾/校验
-    // 上位机没明确 CRC 算法，暂时填 0 或者固定值，防止数组越界
-    tx_buf[14] = 0;
+    // 4. 【新增】计算 BCC 校验位并填入 [14]
+    // 校验范围：index 0 到 13 (头+数据)
+    uint8_t checksum = 0;
+    for (int i = 0; i < 14; i++) {
+        checksum ^= tx_buf[i];
+    }
+    tx_buf[14] = checksum; // 填入校验值
     tx_buf[15] = 0x0D;
 }
 /*
@@ -132,6 +137,18 @@ void get_protocol_info(uint8_t *rx_buf, Vision_Recv_s *rx_data)         // 接�
     }
     if (rx_buf[15] != 0x0D) {
         return; // 帧尾不对，说明数据可能损坏或长度错位
+    }
+        // 3. 【新增】检查 BCC 校验位
+    // 校验范围：index 0 到 13
+    // 校验目标：index 14
+    uint8_t calculated_sum = 0;
+    for (int i = 0; i < 14; i++) {
+        calculated_sum ^= rx_buf[i];
+    }
+
+    if (calculated_sum != rx_buf[14]) {
+        // 校验失败（数据损坏），直接返回，不更新数据
+        return; 
     }
     // 直接解析，无需 CRC32 (除非你确定上位机发了 CRC)
     rx_data->ACTION_DATA.sof = rx_buf[0];
