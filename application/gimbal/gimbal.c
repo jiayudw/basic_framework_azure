@@ -20,21 +20,21 @@ static Vision_Send_s vision_send_data; // 云台视觉数据
 // 专门用于 Ozone 调试的全局变量
 volatile float debug_speed_target = 0.0f;
 // YAW轴调试参数
-volatile float debug_yaw_angle_Kp = 30.0f;
-volatile float debug_yaw_angle_Ki = 0.2f;
-volatile float debug_yaw_angle_Kd = 0.5f;
+volatile float debug_yaw_angle_Kp = 20.0f;
+volatile float debug_yaw_angle_Ki = 0.0f;
+volatile float debug_yaw_angle_Kd = 1.0f;
 
-volatile float debug_yaw_speed_Kp = 50.0f;
+volatile float debug_yaw_speed_Kp = 150.0f;
 volatile float debug_yaw_speed_Ki = 200.0f;
 volatile float debug_yaw_speed_Kd = 0.0f;
 
 // PITCH轴调试参数
-volatile float debug_pitch_angle_Kp = 30.0f;
-volatile float debug_pitch_angle_Ki = 0.1f;
-volatile float debug_pitch_angle_Kd = 0.8f;
+volatile float debug_pitch_angle_Kp = 80.0f;
+volatile float debug_pitch_angle_Ki = 0.3f;
+volatile float debug_pitch_angle_Kd = 0.6f;
 
-volatile float debug_pitch_speed_Kp = 50.0f;
-volatile float debug_pitch_speed_Ki = 350.0f;
+volatile float debug_pitch_speed_Kp = 250.0f;
+volatile float debug_pitch_speed_Ki = 400.0f;
 volatile float debug_pitch_speed_Kd = 0.0f;
 //这我用来方便ozone调参数的，别动！
 void GimbalInit()
