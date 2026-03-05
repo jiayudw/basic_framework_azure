@@ -97,7 +97,7 @@ void ShootInit()
             .close_loop_type = ANGLE_LOOP | SPEED_LOOP | CURRENT_LOOP, 
             .motor_reverse_flag = MOTOR_DIRECTION_NORMAL, // 注意方向设置为拨盘的拨出的击发方向
         },
-        .motor_type = M3508 // 英雄使用m3508
+        .motor_type = M2006 // 英雄使用m3508
     };
     loader = DJIMotorInit(&loader_config);
 
@@ -267,16 +267,16 @@ void ShootTask()
         switch (shoot_cmd_recv.bullet_speed)
         {
         case SMALL_AMU_15:
-            DJIMotorSetRef(friction_l, -10000);
-            DJIMotorSetRef(friction_r, 10000);
+            DJIMotorSetRef(friction_l, 10000);
+            DJIMotorSetRef(friction_r, -10000);
             break;
         case SMALL_AMU_18:
-            DJIMotorSetRef(friction_l, 36000);
-            DJIMotorSetRef(friction_r, -36000);
+            DJIMotorSetRef(friction_l, -36000);
+            DJIMotorSetRef(friction_r, 36000);
             break;
         case SMALL_AMU_30:
-            DJIMotorSetRef(friction_l, 60000);
-            DJIMotorSetRef(friction_r, -60000);
+            DJIMotorSetRef(friction_l, -60000);
+            DJIMotorSetRef(friction_r, 60000);
             break;
         default: // 当前为了调试设定的默认值4000,因为还没有加入裁判系统无法读取弹速.
             DJIMotorSetRef(friction_l, 0);
