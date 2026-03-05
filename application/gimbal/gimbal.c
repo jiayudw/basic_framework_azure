@@ -33,7 +33,7 @@ volatile float debug_pitch_angle_Kp = 80.0f;
 volatile float debug_pitch_angle_Ki = 0.3f;
 volatile float debug_pitch_angle_Kd = 0.6f;
 
-volatile float debug_pitch_speed_Kp = 250.0f;
+volatile float debug_pitch_speed_Kp = 200.0f;
 volatile float debug_pitch_speed_Ki = 400.0f;
 volatile float debug_pitch_speed_Kd = 0.0f;
 //这我用来方便ozone调参数的，别动！
