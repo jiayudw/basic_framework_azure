@@ -142,7 +142,6 @@ modules/motor/motor_task.c \
 modules/oled/oled.c \
 modules/referee/crc_ref.c \
 modules/referee/rm_referee.c \
-modules/referee/referee_UI.c \
 modules/referee/referee_task.c \
 modules/remote/remote_control.c \
 modules/super_cap/super_cap.c \
@@ -313,13 +312,19 @@ OBJECTS = $(addprefix $(BUILD_DIR)/,$(notdir $(C_SOURCES:.c=.o)))
 vpath %.c $(sort $(dir $(C_SOURCES)))
 # list of ASM program objects
 OBJECTS += $(addprefix $(BUILD_DIR)/,$(notdir $(ASM_SOURCES:.s=.o)))
-vpath %.s $(sort $(dir $(ASM_SOURCES)))
+# 注意：删除下面这行 vpath %.s，改用显式规则
+# vpath %.s $(sort $(dir $(ASM_SOURCES)))
 
-$(BUILD_DIR)/%.o: %.c Makefile | $(BUILD_DIR) 
+$(BUILD_DIR)/%.o: %.c Makefile | $(BUILD_DIR)
 	@$(CC) -c $(CFLAGS) -Wa,-a,-ad,-alms=$(BUILD_DIR)/$(notdir $(<:.c=.lst)) $< -o $@
 
-$(BUILD_DIR)/%.o: %.s Makefile | $(BUILD_DIR)
-	@$(AS) -c $(CFLAGS) $< -o $@
+# 显式 ASM 规则，绕过 vpath Windows 路径问题
+# 注意：使用 -MMD -MP -MF 明确指定依赖文件输出路径，防止 GCC 将依赖内容写入源文件
+$(BUILD_DIR)/startup_stm32f407xx.o: startup_stm32f407xx.s Makefile | $(BUILD_DIR)
+	$(AS) -c $(ASFLAGS) -MMD -MP -MF"$(BUILD_DIR)/startup_stm32f407xx.d" "$<" -o "$@"
+
+$(BUILD_DIR)/SEGGER_RTT_ASM_ARMv7M.o: Middlewares/Third_Party/SEGGER/RTT/SEGGER_RTT_ASM_ARMv7M.s Makefile | $(BUILD_DIR)
+	$(AS) -c $(ASFLAGS) -MMD -MP -MF"$(BUILD_DIR)/SEGGER_RTT_ASM_ARMv7M.d" "$<" -o "$@"
 
 $(BUILD_DIR)/$(TARGET).elf: $(OBJECTS) Makefile
 	@$(CC) $(OBJECTS) $(LDFLAGS) -o $@
@@ -339,7 +344,7 @@ $(BUILD_DIR):
 # clean up
 #######################################
 clean:
-	rm -rf $(BUILD_DIR)
+	rd $(BUILD_DIR) /s/q
 
 
 #######################################
@@ -356,7 +361,11 @@ TARGET := basic_framework
 
 download_dap:
 	openocd -f openocd_dap.cfg -c init -c halt -c "flash write_image erase $(BUILD_DIR)/$(TARGET).bin 0x08000000" -c reset -c shutdown
+
+JFLASH = JFlash
+JFLASH_PRJ = stm32.jflash
+
 download_jlink:
-	JFlash -openprj'stm32.jflash' -open'$(BUILD_DIR)/$(TARGET).hex',0x8000000 -auto -startapp -exit
+	$(JFLASH) -openprj$(JFLASH_PRJ) -open$(BUILD_DIR)/$(TARGET).hex,0x8000000 -auto -startapp -exit
 
 # *** EOF ***
