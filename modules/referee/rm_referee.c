@@ -58,37 +58,14 @@ static void JudgeReadData(uint8_t *buff)
 {
     case ID_game_state: // 0x0001
         memcpy(&referee_info.GameState, (buff + DATA_Offset), LEN_game_state);
-        // 以下代码为调试用,读取裁判系统协议内比赛状态数据,并使用H7tools发送至电脑
-        // SEGGER_RTT_SetTerminal(1); // 设置显示的终端
-        // sprintf(printf_buf, "Game Type=%d, Progress=%d, Stage Remain Time=%d, Sync Time Stamp=%llu\r\n",
-        //         referee_info.GameState.game_type, referee_info.GameState.game_progress,
-        //         referee_info.GameState.stage_remain_time, referee_info.GameState.SyncTimeStamp);
-        // SEGGER_RTT_WriteString(0, printf_buf);
         break;
 
     case ID_game_result: // 0x0002
         memcpy(&referee_info.GameResult, (buff + DATA_Offset), LEN_game_result);
-        // 以下代码为调试用,读取裁判系统协议内比赛结果数据,并使用H7tools发送至电脑
-        // SEGGER_RTT_SetTerminal(1); // 设置显示的终端
-        // sprintf(printf_buf, "Winner=%d\r\n", referee_info.GameResult.winner);
-        // SEGGER_RTT_WriteString(0, printf_buf);
         break;
 
-    case ID_game_robot_survivors: // 0x0003
+    case ID_game_robot_HP: // 0x0003  (原 ID_game_robot_survivors -> ID_game_robot_HP)
         memcpy(&referee_info.GameRobotHP, (buff + DATA_Offset), LEN_game_robot_HP);
-        // 以下代码为调试用,读取裁判系统协议内机器人血量数据,并使用H7tools发送至电脑
-        // SEGGER_RTT_SetTerminal(1); // 设置显示的终端
-        // sprintf(printf_buf, "Red 1 Robot HP=%d, Red 2 Robot HP=%d, Red 3 Robot HP=%d, Red 4 Robot HP=%d, Red 7 Robot HP=%d, Red Outpost HP=%d, Red Base HP=%d\r\n"
-        //                     "Blue 1 Robot HP=%d, Blue 2 Robot HP=%d, Blue 3 Robot HP=%d, Blue 4 Robot HP=%d, Blue 7 Robot HP=%d, Blue Outpost HP=%d, Blue Base HP=%d\r\n",
-        //         referee_info.GameRobotHP.red_1_robot_HP, referee_info.GameRobotHP.red_2_robot_HP,
-        //         referee_info.GameRobotHP.red_3_robot_HP, referee_info.GameRobotHP.red_4_robot_HP,
-        //         referee_info.GameRobotHP.red_7_robot_HP, referee_info.GameRobotHP.red_outpost_HP,
-        //         referee_info.GameRobotHP.red_base_HP,
-        //         referee_info.GameRobotHP.blue_1_robot_HP, referee_info.GameRobotHP.blue_2_robot_HP,
-        //         referee_info.GameRobotHP.blue_3_robot_HP, referee_info.GameRobotHP.blue_4_robot_HP,
-        //         referee_info.GameRobotHP.blue_7_robot_HP, referee_info.GameRobotHP.blue_outpost_HP,
-        //         referee_info.GameRobotHP.blue_base_HP);
-        // SEGGER_RTT_WriteString(0, printf_buf);
         break;
 
 	case ID_event_data: // 0x0101
@@ -131,6 +108,11 @@ static void JudgeReadData(uint8_t *buff)
 
 	case ID_game_robot_state: // 0x0201
 		memcpy(&referee_info.GameRobotState, (buff + DATA_Offset), LEN_game_robot_state);
+		// 根据robot_id计算referee_id各字段
+		
+		referee_info.referee_id.Robot_ID    = referee_info.GameRobotState.robot_id;
+		referee_info.referee_id.Robot_Color = (referee_info.GameRobotState.robot_id > 9) ? Robot_Blue : Robot_Red;
+		referee_info.referee_id.Cilent_ID   = referee_info.GameRobotState.robot_id + 0x100; // 客户端ID = 机器人ID + 256
 		// 以下代码为调试用,读取裁判系统协议内机器人状态数据,并使用H7tools发送至电脑
 		// SEGGER_RTT_SetTerminal(1); // 设置显示的终端
 		// sprintf(printf_buf, "Robot ID=%d, Robot Level=%d, Current HP=%d, Max HP=%d, Shooter Barrel Cooling Value=%d, "
@@ -214,6 +196,10 @@ static void JudgeReadData(uint8_t *buff)
 		// 		referee_info.ShootNumAndGoldCoin.projectile_allowance_42mm,
 		// 		referee_info.ShootNumAndGoldCoin.remaining_gold_coin);
 		// SEGGER_RTT_WriteString(0, printf_buf);
+		break;
+	
+		case ID_rfid_status: // 0x0209    RFID状态数据
+		memcpy(&referee_info.RFIDStatus, (buff + DATA_Offset), LEN_rfid_status);
 		break;
 	}
 				// case ID_student_interactive: // 0x0301   syhtodo接收代码未测试

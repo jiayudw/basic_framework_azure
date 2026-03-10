@@ -16,11 +16,12 @@
 #include "dji_motor.h"
 #include "super_cap.h"
 #include "message_center.h"
-#include "referee_task.h"
+#include "rm_referee.h"      // 直接使用裁判系统数据接收，不需要UI
 
 #include "general_def.h"
 #include "bsp_dwt.h"
-#include "referee_UI.h"
+// #include "referee_task.h" // UI任务已移除
+// #include "referee_UI.h"   // UI绘制已移除
 #include "arm_math.h"
 #include "bsp_log.h"
 #include <math.h>  // 添加数学库，用于 fabs/fabsf 绝对值计算
@@ -52,7 +53,7 @@ static Chassis_Ctrl_Cmd_s chassis_cmd_recv;         // 底盘接收到的控制�
 static Chassis_Upload_Data_s chassis_feedback_data; // 底盘回传的反馈数据
 
 static referee_info_t* referee_data; // 用于获取裁判系统的数据
-static Referee_Interactive_info_t ui_data; // UI数据，将底盘中的数据传入此结构体的对应变量中，UI会自动检测是否变化，对应显示UI
+// static Referee_Interactive_info_t ui_data; // UI数据已移除
 
 static SuperCapInstance *cap;                                       // 超级电容
 static DJIMotorInstance *motor_lf, *motor_rf, *motor_lb, *motor_rb; // left right forward back
@@ -112,7 +113,7 @@ void ChassisInit()
     chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL;
     motor_lb = DJIMotorInit(&chassis_motor_config);
 
-    referee_data = UITaskInit(&huart6,&ui_data); // 裁判系统初始化,会同时初始化UI
+    referee_data = RefereeInit(&huart6); // 裁判系统初始化（已移除UI）
 
     // 发布订阅初始化,如果为双板,则需要can comm来传递消息
 #ifdef CHASSIS_BOARD

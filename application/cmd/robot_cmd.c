@@ -76,6 +76,7 @@ void RobotCMDInit()
     gimbal_cmd_send.pitch = 0;
     vision_recv_data->ACTION_DATA.pitch = 0;
     vision_recv_data->ACTION_DATA.yaw = 0;
+    vision_recv_data->ACTION_DATA.distance = -1;
     // vision_recv_data->ACTION_DATA.fire_times = 0;
     shoot_cmd_send.shoot_mode = SHOOT_OFF;
     shoot_cmd_send.load_mode = LOAD_STOP;
@@ -193,9 +194,22 @@ static void RemoteControlSet()
     // 左侧开关状态为[下],遥控器控制下启动视觉调试
     //后续启动视觉，先到当前位置，如果识别到才瞄准
     if (switch_is_down(rc_data[TEMP].rc.switch_left))
-    {
+    {   if( vision_recv_data->ACTION_DATA.distance != -1){
         gimbal_cmd_send.yaw = vision_recv_data->ACTION_DATA.yaw;
         gimbal_cmd_send.pitch =vision_recv_data->ACTION_DATA.pitch;
+    }else{
+        gimbal_cmd_send.yaw -= 0.005f * (float)rc_data[TEMP].rc.rocker_l_;
+        gimbal_cmd_send.pitch += 0.001f * (float)rc_data[TEMP].rc.rocker_l1;
+        if (gimbal_cmd_send.pitch > PITCH_MAX_ANGLE)
+        {
+            gimbal_cmd_send.pitch = PITCH_MAX_ANGLE;
+        }
+        if (gimbal_cmd_send.pitch < PITCH_MIN_ANGLE)
+        {
+            gimbal_cmd_send.pitch = PITCH_MIN_ANGLE;
+        }
+    }
+
         // shoot_cmd_send.shoot_num = vision_recv_data->ACTION_DATA.fire_times;
         // if (shoot_cmd_send.shoot_num == 1)
         // {
@@ -234,13 +248,13 @@ static void RemoteControlSet()
     } else {
         gimbal_cmd_send.yaw -= 0.005f * (float)rc_data[TEMP].rc.rocker_l_;
         gimbal_cmd_send.pitch += 0.001f * (float)rc_data[TEMP].rc.rocker_l1;
-        if (gimbal_cmd_send.pitch > 50)
+        if (gimbal_cmd_send.pitch > PITCH_MAX_ANGLE)
         {
-            gimbal_cmd_send.pitch = 50;
+            gimbal_cmd_send.pitch = PITCH_MAX_ANGLE;
         }
-        if (gimbal_cmd_send.pitch < -20)
+        if (gimbal_cmd_send.pitch < PITCH_MIN_ANGLE)
         {
-            gimbal_cmd_send.pitch = -20;
+            gimbal_cmd_send.pitch = PITCH_MIN_ANGLE;
         }
         // 按照摇杆的输出大小进行角度增量,增益系数需调整
 
@@ -268,7 +282,7 @@ shoot_cmd_send.lid_mode = LID_OPEN;
     else if (curr_dial < -100) { 
         // 【拨轮向上微推】：仅开启摩擦轮预热
         shoot_cmd_send.friction_mode = FRICTION_ON;
-        shoot_cmd_send.shoot_mode = SHOOT_ON;
+
         shoot_cmd_send.load_mode = LOAD_STOP;
     }
     else if (curr_dial > 500) {
