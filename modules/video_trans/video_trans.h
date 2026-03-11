@@ -19,8 +19,8 @@ typedef union {
         uint16_t s:1;       // bit 1
         uint16_t a:1;       // bit 2
         uint16_t d:1;       // bit 3
-        uint16_t shift:1;   // bit 4 (取消修饰属性，作为普通按键)
-        uint16_t ctrl:1;    // bit 5 (同上)
+        uint16_t shift:1;   // bit 4 
+        uint16_t ctrl:1;    // bit 5 
         uint16_t q:1;       // bit 6
         uint16_t e:1;       // bit 7
         uint16_t r:1;       // bit 8
