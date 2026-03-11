@@ -180,6 +180,10 @@ static void RemoteControlSet()
     {
         chassis_cmd_send.chassis_mode = CHASSIS_FOLLOW_GIMBAL_YAW;
         gimbal_cmd_send.gimbal_mode = GIMBAL_GYRO_MODE;
+        // shoot_cmd_send.friction_mode = FRICTION_ON;
+        // shoot_cmd_send.shoot_mode = SHOOT_ON;
+        // shoot_cmd_send.load_mode = LOAD_REVERSE;
+        
     }
     else if (switch_is_down(rc_data[TEMP].rc.switch_right)) // 右侧开关状态[下],底盘和云台分离,底盘保持不转动
     {
@@ -278,6 +282,9 @@ shoot_cmd_send.lid_mode = LID_OPEN;
         shoot_cmd_send.shoot_mode = SHOOT_ON;
         shoot_cmd_send.load_mode = LOAD_BURSTFIRE;
         shoot_cmd_send.shoot_rate = shoot_frequency;
+        // shoot_cmd_send.friction_mode = FRICTION_ON;
+        // shoot_cmd_send.shoot_mode = SHOOT_ON;
+        // shoot_cmd_send.load_mode = LOAD_REVERSE;
     } 
     else if (curr_dial < -100) { 
         // 【拨轮向上微推】：仅开启摩擦轮预热
