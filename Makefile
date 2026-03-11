@@ -158,8 +158,8 @@ application/shoot/shoot.c \
 application/cmd/robot_cmd.c \
 application/robot.c \
 modules/power_meter/power_meter.c \
-modules/power_meter/INA226.c 
-
+modules/power_meter/INA226.c \
+modules/video_trans/video_trans.c
 # ASM sources
 ASM_SOURCES =  \
 startup_stm32f407xx.s \
@@ -271,7 +271,8 @@ C_INCLUDES =  \
 -Imodules/alarm \
 -Imodules  \
 -IMiddlewares/ST/ARM/DSP/Inc \
--Imodules/power_meter 
+-Imodules/power_meter \
+-Imodules/video_trans
 
 
 # compile gcc flags

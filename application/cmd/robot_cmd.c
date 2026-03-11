@@ -8,6 +8,8 @@
 #include "message_center.h"
 #include "general_def.h"
 #include "dji_motor.h"
+#include "video_trans.h"
+
 // bsp
 #include "bsp_dwt.h"
 #include "bsp_log.h"
@@ -28,7 +30,7 @@ static Subscriber_t *chassis_feed_sub; // 底盘反馈信息订阅者
 
 static Chassis_Ctrl_Cmd_s chassis_cmd_send;      // 发送给底盘应用的信息,包括控制信息和UI绘制相关
 static Chassis_Upload_Data_s chassis_fetch_data; // 从底盘应用接收的反馈信息信息,底盘功率枪口热量与底盘运动状态等
-
+static Video_Trans_Data_t *vtm_data;
 static RC_ctrl_t *rc_data;              // 遥控器数据,初始化时返回
 static Vision_Recv_s *vision_recv_data; // 视觉接收数据指针,初始化时返回
 // static Vision_Send_s vision_send_data;  // 视觉发送数据
@@ -50,8 +52,8 @@ static Robot_Status_e robot_state; // 机器人整体工作状态
 void RobotCMDInit()
 {
     rc_data = RemoteControlInit(&huart3);   // 修改为对应串口,注意如果是自研板dbus协议串口需选用添加了反相器的那个
-    vision_recv_data = VisionInit(&huart1); // 视觉通信串口
-
+    vision_recv_data = VisionInit(NULL); // 视觉通信串口
+    vtm_data = VideoTransInit(&huart1);
     gimbal_cmd_pub = PubRegister("gimbal_cmd", sizeof(Gimbal_Ctrl_Cmd_s));
     gimbal_feed_sub = SubRegister("gimbal_feed", sizeof(Gimbal_Upload_Data_s));
     shoot_cmd_pub = PubRegister("shoot_cmd", sizeof(Shoot_Ctrl_Cmd_s));
@@ -235,10 +237,7 @@ static void RemoteControlSet()
         // if (vision_recv_data->ACTION_DATA.reserved_slot % 10 == 2)
         // {
         //     chassis_cmd_send.vy = 0;
-        //      chassis_cmd_send.wz = 0;
-        // }else if (vision_recv_data->ACTION_DATA.reserved_slot % 10 == 0)
-        // {
-        //     chassis_cmd_send.vy = 0;
+        //      chassiuint8_t_cmd_send.vy = 0;
         //     chassis_cmd_send.wz = 0;
         // }else if (vision_recv_data->ACTION_DATA.reserved_slot % 10 == 1)
         // {
@@ -320,7 +319,7 @@ shoot_cmd_send.lid_mode = LID_OPEN;
  *
  */
 static void MouseKeySet()
-{
+{   gimbal_cmd_send.yaw -= 0.005f * (float)vtm_data->rc.ch3;
     if (chassis_fetch_data.chassis_power_limit == 70)
     {
         chassis_cmd_send.chassis_speed_buff = 20000;
@@ -555,7 +554,7 @@ static void MouseKeySet()
  */
 static void EmergencyHandler()
 {
-    if (rc_data[TEMP].lost_flag == 1 || robot_state == ROBOT_STOP) // 还需添加重要应用和模块离线的判断
+    if (rc_data[TEMP].lost_flag == 1 && vtm_data->lost_flag == 1 || robot_state == ROBOT_STOP) // 还需添加重要应用和模块离线的判断
     {
         robot_state = ROBOT_STOP;
         gimbal_cmd_send.gimbal_mode = GIMBAL_ZERO_FORCE;
@@ -566,7 +565,7 @@ static void EmergencyHandler()
         LOGERROR("[CMD] emergency stop!");
     }
 
-    if (rc_data[TEMP].lost_flag == 0)
+    if (rc_data[TEMP].lost_flag == 0 ||vtm_data ->lost_flag == 0  ) 
     {
         robot_state = ROBOT_READY;
         shoot_cmd_send.shoot_mode = SHOOT_ON;
@@ -586,44 +585,14 @@ void RobotCMDTask()
 #endif // GIMBAL_BOARD
     SubGetMessage(shoot_feed_sub, &shoot_fetch_data);
     SubGetMessage(gimbal_feed_sub, &gimbal_fetch_data);
-
+    EmergencyHandler();
     // 根据gimbal的反馈值计算云台和底盘正方向的夹角,不需要传参,通过static私有变量完成
     CalcOffsetAngle();
-    // 根据遥控器左侧开关,确定当前使用的控制模式为遥控器调试还是键鼠
-    if (switch_is_mid(rc_data[TEMP].rc.switch_left)||switch_is_down(rc_data[TEMP].rc.switch_left)) // 遥控器左侧开关状态为[中]或[下],遥控器控制
-    {    
-        RemoteControlSet();
+    if (rc_data[TEMP].lost_flag == 0){
+    RemoteControlSet();
     }
-    else if (switch_is_up(rc_data[TEMP].rc.switch_left)) // 遥控器左侧开关状态为[上],键盘控制和相关模式选择
-    {
-        if (switch_is_down(rc_data[TEMP].rc.switch_right))
-        {
-            MouseKeySet();
-        }
-        //添加弹速控制命令
-        if(chassis_fetch_data.initial_speed/25 > 0.9 ){
-            shoot_cmd_send.bullet_speed = SMALL_AMU_30;
-
-        }
-        if (switch_is_up(rc_data[TEMP].rc.switch_right) && rc_data[TEMP].rc.dial < -200)
-        {
-            shoot_cmd_send.shoot_mode = SHOOT_ON;
-            shoot_cmd_send.friction_mode = FRICTION_ON;
-            shoot_cmd_send.bullet_speed = SMALL_AMU_30;
-        }else if (switch_is_up(rc_data[TEMP].rc.switch_right) && rc_data[TEMP].rc.dial > 200)
-        {
-            shoot_cmd_send.shoot_mode = SHOOT_OFF;
-            shoot_cmd_send.friction_mode = FRICTION_OFF;
-            shoot_cmd_send.bullet_speed = BULLET_SPEED_NONE;
-        }
-        if (switch_is_mid(rc_data[TEMP].rc.switch_right) && rc_data[TEMP].rc.dial < -200)
-        {
-            shoot_cmd_send.lid_mode = LID_OPEN;
-        } 
-        if (switch_is_mid(rc_data[TEMP].rc.switch_right) && rc_data[TEMP].rc.dial > 200)
-        {
-            shoot_cmd_send.lid_mode = LID_CLOSE;
-        }
+    if(vtm_data->lost_flag == 0){
+    MouseKeySet();
     }
     EmergencyHandler(); // 处理模块离线和遥控器急停等紧急情况
 
