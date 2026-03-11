@@ -279,7 +279,12 @@ void DJIMotorControl()
             pid_ref *= -1;
 
         set = (int16_t)pid_ref;
-
+        // 如果当前遍历到的是 Pitch 电机 (根据你配置的 CAN2 和 Tx_ID=2 来判断)
+        // 就把发给它的最终电流强行取反，用来抵消它物理上的反装！
+        if (motor->motor_can_instance->can_handle == &hcan2 && motor->motor_can_instance->tx_id == 2) {
+            set = -set;
+        }
+        // 分组填入发送数据
         group = motor->sender_group;
         num = motor->message_num;
         sender_assignment[group].tx_buff[2 * num] = (uint8_t)(set >> 8);         

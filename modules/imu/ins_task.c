@@ -60,8 +60,8 @@ static void InitQuaternion(float *init_q4)
     for (uint8_t i = 0; i < 100; ++i)
     {
         BMI088_Read(&BMI088);
-        acc_init[X] += BMI088.Accel[X];
-        acc_init[Y] += BMI088.Accel[Y];
+        acc_init[X] += -BMI088.Accel[X];
+        acc_init[Y] += -BMI088.Accel[Y];
         acc_init[Z] += BMI088.Accel[Z];
         DWT_Delay(0.001);
     }
@@ -128,11 +128,11 @@ void INS_Task(void)
     {
         BMI088_Read(&BMI088);
 
-        INS.Accel[X] = BMI088.Accel[X];
-        INS.Accel[Y] = BMI088.Accel[Y];
+        INS.Accel[X] = -BMI088.Accel[X];
+        INS.Accel[Y] = -BMI088.Accel[Y];
         INS.Accel[Z] = BMI088.Accel[Z];
-        INS.Gyro[X] = BMI088.Gyro[X];
-        INS.Gyro[Y] = BMI088.Gyro[Y];
+        INS.Gyro[X] = -BMI088.Gyro[X];
+        INS.Gyro[Y] = -BMI088.Gyro[Y];
         INS.Gyro[Z] = BMI088.Gyro[Z];
 
         // demo function,用于修正安装误差,可以不管,本demo暂时没用
