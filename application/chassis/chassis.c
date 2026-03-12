@@ -44,9 +44,11 @@ attitude_t *Chassis_IMU_data;
 #ifdef ONE_BOARD
 static Publisher_t *chassis_pub;                    // 用于发布底盘的数据
 static Subscriber_t *chassis_sub;                   // 用于订阅底盘的控制命令
+static Subscriber_t *gimbal_sub;    //获取云台角度
 #endif                                              // !ONE_BOARD
 static Chassis_Ctrl_Cmd_s chassis_cmd_recv;         // 底盘接收到的控制命令
 static Chassis_Upload_Data_s chassis_feedback_data; // 底盘回传的反馈数据
+// static Chassis_Send_s chassis_send_data;               // 发送给视觉的底盘数据
 
 static referee_info_t* referee_data; // 用于获取裁判系统的数据
 static Referee_Interactive_info_t ui_data; // UI数据，将底盘中的数据传入此结构体的对应变量中，UI会自动检测是否变化，对应显示UI
@@ -60,6 +62,10 @@ static DJIMotorInstance *motor_lf, *motor_rf, *motor_lb, *motor_rb; // left righ
 /* 私有函数计算的中介变量,设为静态避免参数传递的开销 */
 static float chassis_vx, chassis_vy;     // 将云台系的速度投影到底盘
 static float vt_lf, vt_rf, vt_lb, vt_rb; // 底盘速度解算后的临时输出,待进行限幅
+static float real_vx, real_vy;   // 真实系的速度
+static float time, robot_start; // 计时器相关变量
+
+static float sin_theta, cos_theta;
 
 void ChassisInit()
 {
@@ -69,7 +75,7 @@ void ChassisInit()
         .can_init_config.can_handle = &hcan1,
         .controller_param_init_config = {
             .speed_PID = {
-                .Kp = 10, // 4.5
+                .Kp = 10, // 4.void Chassis5
                 .Ki = 1,  // 0
                 .Kd = 0,  // 0
                 .IntegralLimit = 3000,
@@ -160,10 +166,14 @@ void ChassisInit()
  */
 static void MecanumCalculate()
 {
-    vt_lf =  chassis_vx - chassis_vy - chassis_cmd_recv.wz * LF_CENTER;
-    vt_rf =  chassis_vx + chassis_vy + chassis_cmd_recv.wz * RF_CENTER;
-    vt_lb =  chassis_vx + chassis_vy - chassis_cmd_recv.wz * LB_CENTER;
-    vt_rb =  chassis_vx - chassis_vy + chassis_cmd_recv.wz * RB_CENTER;
+    // vt_lf =  chassis_vx - chassis_vy - chassis_cmd_recv.wz * LF_CENTER;
+    // vt_rf =  chassis_vx + chassis_vy + chassis_cmd_recv.wz * RF_CENTER;
+    // vt_lb =  chassis_vx + chassis_vy - chassis_cmd_recv.wz * LB_CENTER;
+    // vt_rb =  chassis_vx - chassis_vy + chassis_cmd_recv.wz * RB_CENTER;
+    vt_lf =  chassis_vx - chassis_vy ;
+    vt_rf =  chassis_vx + chassis_vy ;
+    vt_lb =  chassis_vx + chassis_vy ;
+    vt_rb =  chassis_vx - chassis_vy ;
 }
 
 /**
@@ -189,6 +199,35 @@ static void EstimateSpeed()
     // 根据电机速度和陀螺仪的角速度进行解算,还可以利用加速度计判断是否打滑(如果有)
     // chassis_feedback_data.vx vy wz =
     //  ...
+
+    float wheel_speed_lf_dps = motor_lf->measure.speed_aps;
+    float wheel_speed_rf_dps = motor_rf->measure.speed_aps;
+    float wheel_speed_lb_dps = motor_lb->measure.speed_aps;
+    float wheel_speed_rb_dps = motor_rb->measure.speed_aps;
+    //逆运动学解算
+    float dps_to_mps = (PERIMETER_WHEEL / REDUCTION_RATIO_WHEEL) / 360.0f;
+    //转换为轮子线速度 
+    float v_lf = wheel_speed_lf_dps * dps_to_mps;
+    float v_rf = wheel_speed_rf_dps * dps_to_mps;
+    float v_lb = wheel_speed_lb_dps * dps_to_mps;
+    float v_rb = wheel_speed_rb_dps * dps_to_mps;
+
+    float vx = (( -v_lf - v_lb + v_rf + v_rb) / 4.0f)/9.0f;  // X方向速度（前后）
+    float vy = ((v_lf - v_lb + v_rf - v_rb) / 4.0f)/9.0f;  // Y方向速度（左右）
+    //float vy = (v_lf + v_rf + v_lb + v_rb) / 4.0f;
+    //float vx = (v_lf - v_rf - v_lb + v_rb) / 4.0f;
+
+    // real_vx = vx*cos_theta + vy*sin_theta;
+    // real_vy = -vx*sin_theta + vy*cos_theta;
+
+    chassis_feedback_data.speed_vx = vx;
+    chassis_feedback_data.speed_vy = -vy;
+
+
+
+
+    // chassis_feedback_data.speed_wz = chassis_cmd_recv.wz; // 由于没有陀螺仪数据,暂时用命令中的角速度作为反馈,后续增加IMU数据后再修改
+
 }
 
 /* 机器人底盘控制核心任务 */
@@ -198,6 +237,10 @@ void ChassisTask()
     // 后续增加没收到消息的处理(双板的情况)
     // 获取新的控制信息
 #ifdef ONE_BOARD
+    cos_theta = arm_cos_f32(chassis_cmd_recv.offset_angle * DEGREE_2_RAD);
+    sin_theta = arm_sin_f32(chassis_cmd_recv.offset_angle * DEGREE_2_RAD);
+
+    robot_start = DWT_GetTimeline_ms();
     SubGetMessage(chassis_sub, &chassis_cmd_recv);
 #endif
 #ifdef CHASSIS_BOARD
@@ -210,6 +253,7 @@ void ChassisTask()
         DJIMotorStop(motor_rf);
         DJIMotorStop(motor_lb);
         DJIMotorStop(motor_rb);
+
     }
     else
     { // 正常工作
@@ -217,22 +261,23 @@ void ChassisTask()
         DJIMotorEnable(motor_rf);
         DJIMotorEnable(motor_lb);
         DJIMotorEnable(motor_rb);
+
     }
 
     // 根据控制模式设定旋转速度
     switch (chassis_cmd_recv.chassis_mode)
     {
     case CHASSIS_NO_FOLLOW: // 底盘不旋转,但维持全向机动,一般用于调整云台姿态
-        // chassis_cmd_recv.wz = 0;
+        chassis_cmd_recv.wz = 0.0f;// v = 0
         break;
     case CHASSIS_FOLLOW_GIMBAL_YAW: // 跟随云台,不单独设置pid,以误差角度平方为速度输出
         chassis_cmd_recv.wz = 1.5f * chassis_cmd_recv.offset_angle * abs(chassis_cmd_recv.offset_angle);
         break;
     case CHASSIS_ROTATE: // 自旋,同时保持全向机动;当前wz维持定值,后续增加不规则的变速策略
-        chassis_cmd_recv.wz = 2000;
+        chassis_cmd_recv.wz = 200;
         if ((chassis_cmd_recv.vx == 0) && (chassis_cmd_recv.vy == 0))
         {
-            chassis_cmd_recv.wz = 2000;
+            chassis_cmd_recv.wz = 220;
         }
         break;
     default:
@@ -241,7 +286,11 @@ void ChassisTask()
 
     // 根据云台和底盘的角度offset将控制量映射到底盘坐标系上
     // 底盘逆时针旋转为角度正方向;云台命令的方向以云台指向的方向为x,采用右手系(x指向正北时y在正东)
-    static float sin_theta, cos_theta;
+    // chassis_vy = chassis_cmd_recv.vy;
+    // chassis_vx = chassis_cmd_recv.vx;
+    // chassis_vx = chassis_cmd_recv.vx;//消除了云台速度对底盘速度的影响
+    // chassis_vy = chassis_cmd_recv.vy;
+    tatic float sin_theta, cos_theta;
     cos_theta = arm_cos_f32(chassis_cmd_recv.offset_angle * DEGREE_2_RAD);
     sin_theta = arm_sin_f32(chassis_cmd_recv.offset_angle * DEGREE_2_RAD);
     chassis_vy = chassis_cmd_recv.vx * sin_theta + chassis_cmd_recv.vy * cos_theta;  
@@ -252,6 +301,9 @@ void ChassisTask()
 
     // 根据电机的反馈速度和IMU(如果有)计算真实速度
     EstimateSpeed();
+
+    //这
+
 
     // // 获取裁判系统数据   建议将裁判系统与底盘分离，所以此处数据应使用消息中心发送
     // // 我方颜色id小于7是红色,大于7是蓝色,注意这里发送的是对方的颜色, 0:blue , 1:red
@@ -273,10 +325,14 @@ void ChassisTask()
 
     //添加弹速反馈
     chassis_feedback_data.initial_speed = referee_data->ShootData.initial_speed;
-    //添加底盘速度控制指令反馈代码
-    chassis_feedback_data.speed_vx = chassis_cmd_recv.vx;
-    chassis_feedback_data.speed_vy = chassis_cmd_recv.vy;
+    
+    // 添加底盘速度控制指令反馈代码
+    // chassis_feedback_data.speed_vx = chassis_cmd_recv.vx;
+    // chassis_feedback_data.speed_vy = chassis_cmd_recv.vy;
     chassis_feedback_data.speed_wz = chassis_cmd_recv.wz;
+    
+    // 发送底盘数据到上位机
+    // ChassisSend(&chassis_send_data);
 
     PubPushMessage(chassis_pub, (void *)&chassis_feedback_data);
     // 根据裁判系统的反馈数据和电容数据对输出限幅并设定闭环参考值

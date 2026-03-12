@@ -7,6 +7,7 @@
 #include "bsp_log.h"
 #include "bmi088.h"
 #include "master_process.h"
+#include "cmsis_os.h"
 
 static attitude_t *gimba_IMU_data; // 云台IMU数据
 static DJIMotorInstance *yaw_motor, *pitch_motor;
@@ -17,6 +18,8 @@ static Gimbal_Ctrl_Cmd_s gimbal_cmd_recv;         // 来自cmd的控制信息
 static Subscriber_t *chassis_sub;     // 底盘裁判系统数据订阅者
 static Chassis_Upload_Data_s chassis_refe_data; // 底盘裁判系统数据
 static Vision_Send_s vision_send_data; // 云台视觉数据 
+
+static float last_time,time_delta; // 计时变量
 // 专门用于 Ozone 调试的全局变量
 volatile float debug_speed_target = 0.0f;
 // YAW轴调试参数
@@ -37,6 +40,7 @@ volatile float debug_pitch_speed_Kp = 50.0f;
 volatile float debug_pitch_speed_Ki = 350.0f;
 volatile float debug_pitch_speed_Kd = 0.0f;
 //这我用来方便ozone调参数的，别动！
+static float x,y;
 void GimbalInit()
 {
     gimba_IMU_data = INS_Init(); // IMU先初始化,获取姿态数据指针赋给yaw电机的其他数据来源
@@ -122,6 +126,29 @@ void GimbalInit()
     gimbal_sub = SubRegister("gimbal_cmd", sizeof(Gimbal_Ctrl_Cmd_s));
     chassis_sub = SubRegister("chassis_feed", sizeof(Chassis_Upload_Data_s));
 }
+// void gimbal_absolute_angle_c(){
+//     static float yaw_motor_encoder_angle = 0.0f;
+//     // 云台相对角度 = 云台绝对角度 (IMU) - 底盘角度 (电机编码器)
+//     static float gimbal_relative_to_chassis = 0.0f;
+//     if (yaw_motor != NULL) {
+//         // 从电机控制器中读取编码器反馈角度
+//         yaw_motor_encoder_angle = yaw_motor->motor_controller.angle_feedback;
+//     }
+//     // 计算云台相对于底盘的旋转角度
+//     gimbal_relative_to_chassis = gimba_IMU_data->YawTotalAngle - yaw_motor_encoder_angle;
+    
+//     // 角度归一化到 [-180, 180]
+//     while (gimbal_relative_to_chassis > 180.0f) {
+//         gimbal_relative_to_chassis -= 360.0f;
+//     }
+//     while (gimbal_relative_to_chassis < -180.0f) {
+//         gimbal_relative_to_chassis += 360.0f;
+//     }
+    
+//     // 将相对角度添加到反馈数据中
+//     gimbal_feedback_data.gimbal_relative_angle = gimbal_relative_to_chassis;
+//     gimbal_feedback_data.yaw_motor_encoder_angle = yaw_motor_encoder_angle;
+// }
 
 /* 机器人云台控制核心任务,后续考虑只保留IMU控制,不再需要电机的反馈 */
 void GimbalTask()
@@ -195,14 +222,31 @@ void GimbalTask()
     // ...
 
     // 设置反馈数据,主要是imu和yaw的ecd
+    static float cos_yaw,sin_yaw;
+    float time_delta = DWT_GetTimeline_ms() - last_time;
+    last_time = DWT_GetTimeline_ms();
+
+    cos_yaw = arm_cos_f32(gimbal_feedback_data.gimbal_imu_data.Yaw * DEGREE_2_RAD);
+    sin_yaw = arm_sin_f32(gimbal_feedback_data.gimbal_imu_data.Yaw * DEGREE_2_RAD);
+    float chassis_send_vx = cos_yaw * chassis_refe_data.speed_vx + sin_yaw * chassis_refe_data.speed_vy;
+    float chassis_send_vy = -sin_yaw * chassis_refe_data.speed_vx + cos_yaw * chassis_refe_data.speed_vy;
+    x +=  chassis_send_vx*time_delta/10000.0f; // 目前没有多传感器融合的需求,frame_id暂时没什么用,先固定为0
+    y +=  chassis_send_vy*time_delta/10000.0f;
+    vision_send_data.x = x;
+    vision_send_data.y = y;
     gimbal_feedback_data.gimbal_imu_data = *gimba_IMU_data;
-    gimbal_feedback_data.yaw_motor_single_round_angle = yaw_motor->measure.angle_single_round;
-    vision_send_data.sof = 'P';
-    vision_send_data.mode = 1;
-    vision_send_data.roll  = gimbal_feedback_data.gimbal_imu_data.Roll;
     vision_send_data.pitch = gimbal_feedback_data.gimbal_imu_data.Pitch;
     vision_send_data.yaw = gimbal_feedback_data.gimbal_imu_data.Yaw;   
-    // vision_send_data.reserved_slot = chassis_refe_data.robot_HP;
+    vision_send_data.roll = gimbal_feedback_data.gimbal_imu_data.Roll;
+    // vision_send_data.chassis_angle = 0.0f;
+
+    // vision_send_data.vx = chassis_refe_data.speed_vx;
+    // vision_send_data.vy = chassis_refe_data.speed_vy;
+    // vision_send_data.present_roll = chassis_refe_data.speed_wz;
+    // vision_send_data.present_pitch = chassis_refe_data.speed_vx;
+    // vision_send_data.present_yaw = chassis_refe_data.speed_vy;   
+    // vision_send_data.reserved_slot = 0;
+    // void gimbal_absolute_angle_c();
     VisionSend(&vision_send_data);
     // 推送消息
     PubPushMessage(gimbal_pub, (void *)&gimbal_feedback_data);

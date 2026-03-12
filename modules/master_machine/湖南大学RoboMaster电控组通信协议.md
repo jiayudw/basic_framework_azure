@@ -71,3 +71,4 @@ uint16_t get_protocol_info(uint8_t *rx_buf,			 //接收到的原始数据
 ```
 
 将收到的一包原始数据buff地址传入，若校验通过，会把收到的标志位和float数据解析出来，保存在`flags_register*`和 `rx_data[]`中。
+c板stm32f407IG的SWD接口每个对应的是哪个，从左到右

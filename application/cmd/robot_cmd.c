@@ -44,6 +44,11 @@ static Shoot_Ctrl_Cmd_s shoot_cmd_send;      // 传递给发射的控制信息
 static Shoot_Upload_Data_s shoot_fetch_data; // 从发射获取的反馈信息
 
 static Robot_Status_e robot_state; // 机器人整体工作状态
+// uint8_t map_switch(uint16_t raw) {
+//     if (raw < 1200) return 0;
+//     else if (raw < 1700) return 1;
+//     else return 2;
+// }
 
 
 
@@ -245,66 +250,134 @@ static void RemoteControlSet()
         //     chassis_cmd_send.vy = -0;
         //     chassis_cmd_send.wz = 0;
         // }
-    } else {
-        gimbal_cmd_send.yaw -= 0.005f * (float)rc_data[TEMP].rc.rocker_l_;
-        gimbal_cmd_send.pitch += 0.001f * (float)rc_data[TEMP].rc.rocker_l1;
-        if (gimbal_cmd_send.pitch > PITCH_MAX_ANGLE)
-        {
-            gimbal_cmd_send.pitch = PITCH_MAX_ANGLE;
-        }
-        if (gimbal_cmd_send.pitch < PITCH_MIN_ANGLE)
-        {
-            gimbal_cmd_send.pitch = PITCH_MIN_ANGLE;
-        }
-        // 按照摇杆的输出大小进行角度增量,增益系数需调整
+    // } else {
+        // gimbal_cmd_send.yaw = 20;
+        // gimbal_cmd_send.pitch = 20;
+        //处理既不导航也不小陀螺的情况,默认云台跟随模式
+        // gimbal_cmd_send.yaw = vision_recv_data->ACTION_DATA.yaw;
+        // gimbal_cmd_send.pitch = vision_recv_data->ACTION_DATA.pitch;
 
-        // 底盘参数,目前没有加入小陀螺(调试似乎暂时没有必要),系数需要调整
-        chassis_cmd_send.vx = 20.0f * (float)rc_data[TEMP].rc.rocker_r1; // 右侧摇杆竖直方向控制x方向速度
-        chassis_cmd_send.vy = -20.0f * (float)rc_data[TEMP].rc.rocker_r_; // 右侧摇杆水平方向控制y方向速度
-
+    if (gimbal_cmd_send.pitch > 50)
+    {
+        gimbal_cmd_send.pitch = 50;
     }
+    if (gimbal_cmd_send.pitch < -20)
+    {
+        gimbal_cmd_send.pitch = -20;
+    }
+    static float chassis_target_angle = 0.0f;  // 底盘目标朝向 (世界坐标系)
+    static float chassis_current_angle = 0.0f; // 底盘当前朝向 (世界坐标系)
+    
+    // 获取底盘当前朝向 (从电机编码器或 IMU 计算)
+    chassis_current_angle = gimbal_fetch_data.yaw_motor_encoder_angle;
+    
+    // 获取云台相对于底盘的角度
+    float relative_angle = gimbal_fetch_data.gimbal_relative_angle;
+    
+    // 计算云台绝对朝向 (世界坐标系)
+    float gimbal_absolute_angle = chassis_current_angle + relative_angle;
+    
+    // 遥控器左摇杆控制底盘移动方向 (世界坐标系)
+    if (rc_data->rc.switch_left == 2) {
+        // 视觉控制模式
+        chassis_cmd_send.vx = vision_recv_data->ACTION_DATA.vx * 14000;
+        chassis_cmd_send.vy = vision_recv_data->ACTION_DATA.vy * 14000;
+        chassis_cmd_send.wz = vision_recv_data->ACTION_DATA.wz * 183.0f * 4.62;
+    }
+    else if (rc_data->rc.switch_left == 3) {
+        // 共同控制模式 - 左摇杆控制底盘移动
+        float joystick_vx = rc_data->rc.rocker_l1 * 10;
+        float joystick_vy = -rc_data->rc.rocker_l_ * 10;
+        
+        // 将摇杆输入从云台坐标系转换到底盘坐标系
+        float cos_angle = arm_cos_f32(relative_angle * DEGREE_2_RAD);
+        float sin_angle = arm_sin_f32(relative_angle * DEGREE_2_RAD);
+        
+        chassis_cmd_send.vx = cos_angle * joystick_vx - sin_angle * joystick_vy;
+        chassis_cmd_send.vy = sin_angle * joystick_vx + cos_angle * joystick_vy;
+    }
+    else {
+        chassis_cmd_send.vx = 0;
+        chassis_cmd_send.vy = 0;
+        chassis_cmd_send.wz = 0;
+    }
+    
+    // 遥控器右摇杆独立控制云台朝向
+    gimbal_cmd_send.yaw -= 0.005f * rc_data->rc.rocker_r1;
+    gimbal_cmd_send.pitch -= 0.001f * rc_data->rc.rocker_r_;
+    // ============================================
+    // if (rc_data->rc.switch_left == 2){//视觉控制模式,底盘完全跟随视觉控制量,系数需要调整
+    //     chassis_cmd_send.vy = vision_recv_data->ACTION_DATA.vy*14000; // 系数待测
+    //     chassis_cmd_send.vx = vision_recv_data->ACTION_DATA.vx*14000; // 系数待测
+    //     chassis_cmd_send.wz = vision_recv_data->ACTION_DATA.wz*183.0f*4.62; // 系数待测
+    //     gimbal_cmd_send.yaw = vision_recv_data->ACTION_DATA.yaw;
+    //     gimbal_cmd_send.pitch = vision_recv_data->ACTION_DATA.pitch;
+    //     }
+    // else if (rc_data->rc.switch_left == 3){//共同控制模式,遥控器和视觉控制量叠加,系数需要调整
+    //     chassis_cmd_send.vy = -rc_data->rc.rocker_l_*10+vision_recv_data->ACTION_DATA.vy*14000; // 系数待测
+    //     chassis_cmd_send.vx = rc_data->rc.rocker_l1*10+vision_recv_data->ACTION_DATA.vx*14000; // 系数待测
+    //     // chassis_cmd_send.wz = -rc_data->rc.rocker_r_*7+vision_recv_data->ACTION_DATA.wz*183.0f*4.62; // 系数待测
+    //     // gimbal_cmd_send.yaw = vision_recv_data->ACTION_DATA.yaw;
+    //     // gimbal_cmd_send.pitch = (6/660)*rc_data->rc.rocker_r1+vision_recv_data->ACTION_DATA.pitch;
+    //     // gimbal_cmd_send.yaw = (6/660)*rc_data->rc.rocker_r_+vision_recv_data->ACTION_DATA.yaw;
+    //     gimbal_cmd_send.yaw -= 0.005f * rc_data->rc.rocker_r1;
+    //     gimbal_cmd_send.pitch -= 0.001f * rc_data->rc.rocker_r_;
+    // }
+    // else{ //OFF保护措施全停止
+    //     chassis_cmd_send.vy = 0; // 系数待测
+    //     chassis_cmd_send.vx = 0; // 系数待测
+    //     chassis_cmd_send.wz = 0; // 系数待测
+    // }
+    // if (rc_data->rc.switch_right == 1){
+    //     chassis_cmd_send.chassis_mode = CHASSIS_NO_FOLLOW;
+    //     gimbal_cmd_send.gimbal_mode = GIMBAL_FREE_MODE;
+    // }
+    // if (rc_data->rc.switch_right == 3){
+    //     chassis_cmd_send.chassis_mode = CHASSIS_ROTATE;
+    //     gimbal_cmd_send.gimbal_mode = GIMBAL_FREE_MODE;
+    // }
+
 // // ================= 3. 弹速切换逻辑 (拨轮向下) =================
     static uint8_t bullet_speed_index = 1;  // 默认18m/s (index=1)
     static int16_t last_dial = 0;           // 上一次拨轮值
     
-    int16_t curr_dial = rc_data[TEMP].rc.dial;  // 拨轮值, 范围 -660 ~ +660
+    // int16_t curr_dial = rc_data[TEMP].rc.dial;  // 拨轮值, 范围 -660 ~ +660
     
-shoot_cmd_send.lid_mode = LID_OPEN;
+// shoot_cmd_send.lid_mode = LID_OPEN;
 
     // 2. 拨轮发射逻辑：采用互斥结构防止覆盖
-    if (curr_dial < -500) { 
+    if (vision_recv_data->ACTION_DATA.fire_cmd == 0) 
+    { 
         // 【拨轮向上推满】：连发模式
         shoot_cmd_send.friction_mode = FRICTION_ON;
         shoot_cmd_send.shoot_mode = SHOOT_ON;
         shoot_cmd_send.load_mode = LOAD_BURSTFIRE;
         shoot_cmd_send.shoot_rate = shoot_frequency;
     } 
-    else if (curr_dial < -100) { 
+    else if (vision_recv_data->ACTION_DATA.fire_cmd == 1) 
+    { 
         // 【拨轮向上微推】：仅开启摩擦轮预热
         shoot_cmd_send.friction_mode = FRICTION_ON;
-
+        shoot_cmd_send.shoot_mode = SHOOT_ON;
         shoot_cmd_send.load_mode = LOAD_STOP;
     }
-    else if (curr_dial > 500) {
+    else if (vision_recv_data->ACTION_DATA.fire_cmd == 2) 
+    {
         // 【拨轮向下推满】：反转模式（用于清弹）
-        // shoot_cmd_send.friction_mode = FRICTION_ON;
-        // shoot_cmd_send.shoot_mode = SHOOT_ON;
-        // shoot_cmd_send.load_mode = LOAD_REVERSE;
+        shoot_cmd_send.friction_mode = FRICTION_ON;
+        shoot_cmd_send.shoot_mode = SHOOT_ON;
+        shoot_cmd_send.load_mode = LOAD_REVERSE;
+    }
+    else if (vision_recv_data->ACTION_DATA.fire_cmd == 3) 
+    {
+        // 【拨轮向下微推】：单发模式
         shoot_cmd_send.friction_mode = FRICTION_ON;
         shoot_cmd_send.shoot_mode = SHOOT_ON;
         shoot_cmd_send.load_mode = LOAD_1_BULLET;
-    }
-    else if (curr_dial > 100) {
-        // 【拨轮向下微推】：单发模式
-        // shoot_cmd_send.friction_mode = FRICTION_ON;
-        // shoot_cmd_send.shoot_mode = SHOOT_ON;
-        // shoot_cmd_send.load_mode = LOAD_1_BULLET;
         // 如果需要射击完成标志位控制，可以在这里添加 shoot_num 逻辑
-        shoot_cmd_send.friction_mode = FRICTION_ON;
-        shoot_cmd_send.shoot_mode = SHOOT_ON;
-        shoot_cmd_send.load_mode = LOAD_STOP;
     }
-    else {
+    else 
+    {
         // 【拨轮中位】：停止发射逻辑，关闭摩擦轮
         shoot_cmd_send.friction_mode = FRICTION_OFF;
         shoot_cmd_send.shoot_mode = SHOOT_OFF;
@@ -312,7 +385,7 @@ shoot_cmd_send.lid_mode = LID_OPEN;
     }
     
     // 3. 设定固定弹速（代码一风格）
-    shoot_cmd_send.bullet_speed = SMALL_AMU_15; 
+    shoot_cmd_send.bullet_speed =0;// SMALL_AMU_18; 
 }
 
 /**
@@ -392,74 +465,76 @@ static void MouseKeySet()
     // }
     //设置默认控制模式
     chassis_cmd_send.chassis_mode = CHASSIS_NO_FOLLOW;
-    chassis_cmd_send.wz = rc_data[TEMP].key[KEY_PRESS].q*5000-rc_data[TEMP].key[KEY_PRESS].e*5000;
+    // chassis_cmd_send.wz = rc_data[TEMP].key[KEY_PRESS].q*5000-rc_data[TEMP].key[KEY_PRESS].e*5000;
     gimbal_cmd_send.gimbal_mode = GIMBAL_GYRO_MODE;
-    //底盘控制量设置
-    chassis_cmd_send.vx = rc_data[TEMP].key[KEY_PRESS].d * chassis_cmd_send.chassis_speed_buff - rc_data[TEMP].key[KEY_PRESS].a * chassis_cmd_send.chassis_speed_buff; // 系数待测
-    chassis_cmd_send.vy = rc_data[TEMP].key[KEY_PRESS].w * chassis_cmd_send.chassis_speed_buff - rc_data[TEMP].key[KEY_PRESS].s * chassis_cmd_send.chassis_speed_buff;
-
-    if (rc_data[TEMP].mouse.press_r == 1)
-    {
-        // if (vision_recv_data->ACTION_DATA.abs_yaw == 0)
-        // {
-        //     gimbal_cmd_send.yaw -= 0.005f * (float)rc_data[TEMP].mouse.x;
+    // //底盘控制量设置
+    // chassis_cmd_send.vx = rc_data[TEMP].key[KEY_PRESS].d * chassis_cmd_send.chassis_speed_buff - rc_data[TEMP].key[KEY_PRESS].a * chassis_cmd_send.chassis_speed_buff; // 系数待测
+    // chassis_cmd_send.vy = rc_data[TEMP].key[KEY_PRESS].w * chassis_cmd_send.chassis_speed_buff - rc_data[TEMP].key[KEY_PRESS].s * chassis_cmd_send.chassis_speed_buff;
+    // chassis_cmd_send.vx = vi;
+    // chassis_cmd_send.vy = vision_recv_data->ACTION_DATA.vy;
+    // chassis_cmd_send.wz = vision_recv_data->ACTION_DATA.wz;
+    // if (rc_data[TEMP].mouse.press_r == 1)
+    // {
+    //     // if (vision_recv_data->ACTION_DATA.abs_yaw == 0)
+    //     // {
+    //     //     gimbal_cmd_send.yaw -= 0.005f * (float)rc_data[TEMP].mouse.x;
             
-        // }else if (vision_recv_data->ACTION_DATA.abs_pitch == 0)
-        // {
-        //     gimbal_cmd_send.pitch -= 0.001f * (float)rc_data[TEMP].mouse.y;
-        // }else{
-        //     gimbal_cmd_send.yaw = vision_recv_data->ACTION_DATA.abs_yaw;
-        //     gimbal_cmd_send.pitch =vision_recv_data->ACTION_DATA.abs_pitch;
-        // }
+    //     // }else if (vision_recv_data->ACTION_DATA.abs_pitch == 0)
+    //     // {
+    //     //     gimbal_cmd_send.pitch -= 0.001f * (float)rc_data[TEMP].mouse.y;
+    //     // }else{
+    //     //     gimbal_cmd_send.yaw = vision_recv_data->ACTION_DATA.abs_yaw;
+    //     //     gimbal_cmd_send.pitch =vision_recv_data->ACTION_DATA.abs_pitch;
+    //     // }
         
    
-        // if (gimbal_cmd_send.pitch > 50)
-        // {
-        //     gimbal_cmd_send.pitch = 50;
-        // }
-        // if (gimbal_cmd_send.pitch < -20)
-        // {
-        //     gimbal_cmd_send.pitch = -20;
-        // }
-        //默认鼠标右键是开启视觉模式，但是目前没有视觉代码我把上面代码注释掉以防疯车
-        gimbal_cmd_send.yaw -= 0.005f * (float)rc_data[TEMP].mouse.x;
-        gimbal_cmd_send.pitch -= 0.001f * (float)rc_data[TEMP].mouse.y;
-        if (gimbal_cmd_send.pitch > 50)
-        {
-            gimbal_cmd_send.pitch = 50;
-        }
-        if (gimbal_cmd_send.pitch < -20)
-        {
-            gimbal_cmd_send.pitch = -20;
-        }
-    } else {
-        gimbal_cmd_send.yaw -= 0.005f * (float)rc_data[TEMP].mouse.x;
-        gimbal_cmd_send.pitch -= 0.001f * (float)rc_data[TEMP].mouse.y;
-        if (gimbal_cmd_send.pitch > 50)
-        {
-            gimbal_cmd_send.pitch = 50;
-        }
-        if (gimbal_cmd_send.pitch < -20)
-        {
-            gimbal_cmd_send.pitch = -20;
-        }
-    }
+    //     // if (gimbal_cmd_send.pitch > 50)
+    //     // {
+    //     //     gimbal_cmd_send.pitch = 50;
+    //     // }
+    //     // if (gimbal_cmd_send.pitch < -20)
+    //     // {
+    //     //     gimbal_cmd_send.pitch = -20;
+    //     // }
+    //     //默认鼠标右键是开启视觉模式，但是目前没有视觉代码我把上面代码注释掉以防疯车
+    //     gimbal_cmd_send.yaw -= 0.005f * (float)rc_data[TEMP].mouse.x;
+    //     gimbal_cmd_send.pitch -= 0.001f * (float)rc_data[TEMP].mouse.y;
+    //     if (gimbal_cmd_send.pitch > 50)
+    //     {
+    //         gimbal_cmd_send.pitch = 50;
+    //     }
+    //     if (gimbal_cmd_send.pitch < -20)
+    //     {
+    //         gimbal_cmd_send.pitch = -20;
+    //     }
+    // } else {
+    //     gimbal_cmd_send.yaw -= 0.005f * (float)rc_data[TEMP].mouse.x;
+    //     gimbal_cmd_send.pitch -= 0.001f * (float)rc_data[TEMP].mouse.y;
+    //     if (gimbal_cmd_send.pitch > 50)
+    //     {
+    //         gimbal_cmd_send.pitch = 50;
+    //     }
+    //     if (gimbal_cmd_send.pitch < -20)
+    //     {
+    //         gimbal_cmd_send.pitch = -20;
+    //     }
+    // }
 
 
-    switch (rc_data[TEMP].key_count[KEY_PRESS][Key_R] % 2) // R键开关弹舱
-    {
-    case 0:
-        shoot_cmd_send.lid_mode = LID_CLOSE;
-        break;
+    // switch (rc_data[TEMP].key_count[KEY_PRESS][Key_R] % 2) // R键开关弹舱
+    // {
+    // case 0:
+    //     shoot_cmd_send.lid_mode = LID_CLOSE;
+    //     break;
     
-    default:
-        shoot_cmd_send.lid_mode = LID_OPEN;
-        break;
-    }
-    if (chassis_cmd_send.vx != 0 && chassis_cmd_send.vy != 0)
-    {
-        rc_data[TEMP].key_count[KEY_PRESS][Key_R] = 0;
-    }
+    // default:
+    //     shoot_cmd_send.lid_mode = LID_OPEN;
+    //     break;
+    // }
+    // if (chassis_cmd_send.vx != 0 && chassis_cmd_send.vy != 0)
+    // {
+    //     rc_data[TEMP].key_count[KEY_PRESS][Key_R] = 0;
+    // }
     
     // switch (rc_data[TEMP].key[KEY_PRESS].f) // F键开关摩擦轮
     // {
@@ -472,79 +547,78 @@ static void MouseKeySet()
     //     shoot_cmd_send.friction_mode = FRICTION_ON;
     //     shoot_cmd_send.bullet_speed = 30;
     //     break;
+    // // }
+    // if (rc_data[TEMP].key[KEY_PRESS].f == 1)
+    // {
+    //     shoot_cmd_send.friction_mode = FRICTION_ON;
+    //     shoot_cmd_send.bullet_speed = 30;
     // }
-    if (rc_data[TEMP].key[KEY_PRESS].f == 1)
-    {
-        shoot_cmd_send.friction_mode = FRICTION_ON;
-        shoot_cmd_send.bullet_speed = 30;
-    }
-    if (rc_data[TEMP].key[KEY_PRESS].g == 1)
-    {
-        shoot_cmd_send.friction_mode = FRICTION_OFF;
-        shoot_cmd_send.bullet_speed = 0;
-    }
+    // if (rc_data[TEMP].key[KEY_PRESS].g == 1)
+    // {
+    //     shoot_cmd_send.friction_mode = FRICTION_OFF;
+    //     shoot_cmd_send.bullet_speed = 0;
+    // }
     
     
-    switch (rc_data[TEMP].key[KEY_PRESS].shift) // 小陀螺
-    {
-    case 1:
-        chassis_cmd_send.chassis_mode = CHASSIS_ROTATE;
-        break;
+    // switch (rc_data[TEMP].key[KEY_PRESS].shift) // 小陀螺
+    // {
+    // case 1:
+    //     chassis_cmd_send.chassis_mode = CHASSIS_ROTATE;
+    //     break;
 
-    default:
+    // default:
         
-        break;
-    }
+    //     break;
+    // }
 
     
-    switch (rc_data[TEMP].key[KEY_PRESS].ctrl)
-    {
-    case 1:
-        chassis_cmd_send.chassis_mode = CHASSIS_FOLLOW_GIMBAL_YAW;
-        break;
+    // switch (rc_data[TEMP].key[KEY_PRESS].ctrl)
+    // {
+    // case 1:
+    //     chassis_cmd_send.chassis_mode = CHASSIS_FOLLOW_GIMBAL_YAW;
+    //     break;
     
-    default:
+    // default:
 
-        break;
-    }
-    if (rc_data[TEMP].mouse.press_l == 0)
-    {
-        shoot_cmd_send.load_mode = LOAD_STOP;
-    }
-    switch (rc_data[TEMP].key[KEY_PRESS].c) // C键设置播弹盘反转
-    {
-    case 0:
+    //     break;
+    // }
+    // if (rc_data[TEMP].mouse.press_l == 0)
+    // {
+    //     shoot_cmd_send.load_mode = LOAD_STOP;
+    // }
+    // switch (rc_data[TEMP].key[KEY_PRESS].c) // C键设置播弹盘反转
+    // {
+    // case 0:
 
-        break;
+    //     break;
 
-    default:
-        shoot_cmd_send.load_mode = LOAD_REVERSE;
-        shoot_cmd_send.shoot_rate = shoot_frequency;
-        shoot_cmd_send.shoot_num = 0;
-        break;
-    }
-    if (rc_data[TEMP].mouse.press_l == 1)
-    {
-        switch (rc_data[TEMP].key_count[KEY_PRESS][Key_Z]%2) // z键设置发射模式
-        {
-        case 0:
-            shoot_cmd_send.load_mode = LOAD_BURSTFIRE;
-            shoot_cmd_send.shoot_rate = shoot_frequency;
-            shoot_cmd_send.shoot_num = 0;
-            break;
+    // default:
+    //     shoot_cmd_send.load_mode = LOAD_REVERSE;
+    //     shoot_cmd_send.shoot_rate = shoot_frequency;
+    //     shoot_cmd_send.shoot_num = 0;
+    //     break;
+    // }
+    // if (rc_data[TEMP].mouse.press_l == 1)
+    // {
+    //     switch (rc_data[TEMP].key_count[KEY_PRESS][Key_Z]%2) // z键设置发射模式
+    //     {
+    //     case 0:
+    //         shoot_cmd_send.load_mode = LOAD_BURSTFIRE;
+    //         shoot_cmd_send.shoot_rate = shoot_frequency;
+    //         shoot_cmd_send.shoot_num = 0;
+    //         break;
         
-        case 1:
-            shoot_cmd_send.load_mode = LOAD_1_BULLET;
-            shoot_cmd_send.shoot_num = 1;
-            if (shoot_fetch_data.shoot_finish_flag == 1)
-            {
-                shoot_cmd_send.shoot_num = 0;
-            }
-            break;
-        }
-    }
-    
+    //     case 1:
+    //         shoot_cmd_send.load_mode = LOAD_1_BULLET;
+    //         shoot_cmd_send.shoot_num = 1;
+    //         if (shoot_fetch_data.shoot_finish_flag == 1)
+    //         {
+    //             shoot_cmd_send.shoot_num = 0;
+    //         }
+    //         break;
+    //     }
 }
+    
 
 /**
  * @brief  紧急停止,包括遥控器左上侧拨轮打满/重要模块离线/双板通信失效等
@@ -555,23 +629,24 @@ static void MouseKeySet()
  */
 static void EmergencyHandler()
 {
-    if (rc_data[TEMP].lost_flag == 1 || robot_state == ROBOT_STOP) // 还需添加重要应用和模块离线的判断
+    // if (rc_data[TEMP].lost_flag == 1 || robot_state == ROBOT_STOP) // 还需添加重要应用和模块离线的判断
+    if (robot_state == ROBOT_STOP)
     {
         robot_state = ROBOT_STOP;
-        gimbal_cmd_send.gimbal_mode = GIMBAL_ZERO_FORCE;
-        chassis_cmd_send.chassis_mode = CHASSIS_ZERO_FORCE;
+        gimbal_cmd_send.gimbal_mode = GIMBAL_FREE_MODE;//change
+        chassis_cmd_send.chassis_mode = CHASSIS_NO_FOLLOW;
         shoot_cmd_send.shoot_mode = SHOOT_OFF;
         shoot_cmd_send.friction_mode = FRICTION_OFF;
         shoot_cmd_send.load_mode = LOAD_STOP;
         LOGERROR("[CMD] emergency stop!");
     }
 
-    if (rc_data[TEMP].lost_flag == 0)
-    {
-        robot_state = ROBOT_READY;
-        shoot_cmd_send.shoot_mode = SHOOT_ON;
-                LOGINFO("[CMD] reinstate, robot ready");
-    }
+    // if (rc_data[TEMP].lost_flag == 1) //change here
+    // {
+    //     robot_state = ROBOT_READY;
+    //     shoot_cmd_send.shoot_mode = SHOOT_ON;
+    //             LOGINFO("[CMD] reinstate, robot ready");
+    // }
 }
 
 /* 机器人核心控制任务,200Hz频率运行(必须高于视觉发送频率) */
@@ -589,42 +664,43 @@ void RobotCMDTask()
 
     // 根据gimbal的反馈值计算云台和底盘正方向的夹角,不需要传参,通过static私有变量完成
     CalcOffsetAngle();
-    // 根据遥控器左侧开关,确定当前使用的控制模式为遥控器调试还是键鼠
-    if (switch_is_mid(rc_data[TEMP].rc.switch_left)||switch_is_down(rc_data[TEMP].rc.switch_left)) // 遥控器左侧开关状态为[中]或[下],遥控器控制
-    {    
-        RemoteControlSet();
-    }
-    else if (switch_is_up(rc_data[TEMP].rc.switch_left)) // 遥控器左侧开关状态为[上],键盘控制和相关模式选择
-    {
-        if (switch_is_down(rc_data[TEMP].rc.switch_right))
-        {
-            MouseKeySet();
-        }
-        //添加弹速控制命令
-        if(chassis_fetch_data.initial_speed/25 > 0.9 ){
-            shoot_cmd_send.bullet_speed = SMALL_AMU_30;
+    // // 根据遥控器左侧开关,确定当前使用的控制模式为遥控器调试还是键鼠
+    // if (switch_is_mid(rc_data[TEMP].rc.switch_left)||switch_is_down(rc_data[TEMP].rc.switch_left)) // 遥控器左侧开关状态为[中]或[下],遥控器控制
+    // {    
+    
+    RemoteControlSet();
+    // }
+    // else if (switch_is_up(rc_data[TEMP].rc.switch_left)) // 遥控器左侧开关状态为[上],键盘控制和相关模式选择
+    // {
+    //     if (switch_is_down(rc_data[TEMP].rc.switch_right))
+    //     {
+    //         MouseKeySet();
+    //     }
+    //     //添加弹速控制命令
+    //     if(chassis_fetch_data.initial_speed/25 > 0.9 ){
+    //         shoot_cmd_send.bullet_speed = SMALL_AMU_30;
 
-        }
-        if (switch_is_up(rc_data[TEMP].rc.switch_right) && rc_data[TEMP].rc.dial < -200)
-        {
-            shoot_cmd_send.shoot_mode = SHOOT_ON;
-            shoot_cmd_send.friction_mode = FRICTION_ON;
-            shoot_cmd_send.bullet_speed = SMALL_AMU_30;
-        }else if (switch_is_up(rc_data[TEMP].rc.switch_right) && rc_data[TEMP].rc.dial > 200)
-        {
-            shoot_cmd_send.shoot_mode = SHOOT_OFF;
-            shoot_cmd_send.friction_mode = FRICTION_OFF;
-            shoot_cmd_send.bullet_speed = BULLET_SPEED_NONE;
-        }
-        if (switch_is_mid(rc_data[TEMP].rc.switch_right) && rc_data[TEMP].rc.dial < -200)
-        {
-            shoot_cmd_send.lid_mode = LID_OPEN;
-        } 
-        if (switch_is_mid(rc_data[TEMP].rc.switch_right) && rc_data[TEMP].rc.dial > 200)
-        {
-            shoot_cmd_send.lid_mode = LID_CLOSE;
-        }
-    }
+    //     }
+    //     if (switch_is_up(rc_data[TEMP].rc.switch_right) && rc_data[TEMP].rc.dial < -200)
+    //     {
+    //         shoot_cmd_send.shoot_mode = SHOOT_ON;
+    //         shoot_cmd_send.friction_mode = FRICTION_ON;
+    //         shoot_cmd_send.bullet_speed = SMALL_AMU_30;
+    //     }else if (switch_is_up(rc_data[TEMP].rc.switch_right) && rc_data[TEMP].rc.dial > 200)
+    //     {
+    //         shoot_cmd_send.shoot_mode = SHOOT_OFF;
+    //         shoot_cmd_send.friction_mode = FRICTION_OFF;
+    //         shoot_cmd_send.bullet_speed = BULLET_SPEED_NONE;
+    //     }
+    //     if (switch_is_mid(rc_data[TEMP].rc.switch_right) && rc_data[TEMP].rc.dial < -200)
+    //     {
+    //         shoot_cmd_send.lid_mode = LID_OPEN;
+    //     } 
+    //     if (switch_is_mid(rc_data[TEMP].rc.switch_right) && rc_data[TEMP].rc.dial > 200)
+    //     {
+    //         shoot_cmd_send.lid_mode = LID_CLOSE;
+    //     }
+    // }
     EmergencyHandler(); // 处理模块离线和遥控器急停等紧急情况
 
     // 设置视觉发送数据,还需增加加速度和角速度数据
