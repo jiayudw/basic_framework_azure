@@ -279,6 +279,9 @@ void ChassisTask()
     chassis_feedback_data.speed_vy = chassis_cmd_recv.vy;
     chassis_feedback_data.speed_wz = chassis_cmd_recv.wz;
 
+    // 添加敌方颜色反馈: Robot_Red=0 Robot_Blue=1, 敌方颜色与我方相反
+    chassis_feedback_data.enemy_color = (referee_data->referee_id.Robot_Color == Robot_Red) ? Robot_Blue : Robot_Red;
+
     PubPushMessage(chassis_pub, (void *)&chassis_feedback_data);
     // 根据裁判系统的反馈数据和电容数据对输出限幅并设定闭环参考值
     LimitChassisOutput();
