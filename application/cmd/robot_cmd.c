@@ -200,8 +200,8 @@ static void RemoteControlSet()
         gimbal_cmd_send.yaw = vision_recv_data->ACTION_DATA.yaw;
         gimbal_cmd_send.pitch =vision_recv_data->ACTION_DATA.pitch;
     }else{
-        chassis_cmd_send.vx = 20.0f * (float)rc_data[TEMP].rc.rocker_r1; // 右侧摇杆竖直方向控制x方向速度
-        chassis_cmd_send.vy = -20.0f * (float)rc_data[TEMP].rc.rocker_r_; // 右侧摇杆水平方向控制y方向速度
+        chassis_cmd_send.vx = -20.0f * (float)rc_data[TEMP].rc.rocker_r1; // 右侧摇杆竖直方向控制x方向速度
+        chassis_cmd_send.vy = +20.0f * (float)rc_data[TEMP].rc.rocker_r_; // 右侧摇杆水平方向控制y方向速度
         gimbal_cmd_send.yaw -= 0.005f * (float)rc_data[TEMP].rc.rocker_l_;
         gimbal_cmd_send.pitch += 0.001f * (float)rc_data[TEMP].rc.rocker_l1;
         if (gimbal_cmd_send.pitch > PITCH_MAX_ANGLE)
@@ -499,7 +499,7 @@ void RobotCMDTask()
 #endif // GIMBAL_BOARD
     SubGetMessage(shoot_feed_sub, &shoot_fetch_data);
     SubGetMessage(gimbal_feed_sub, &gimbal_fetch_data);
-    EmergencyHandler();
+    // EmergencyHandler();
     // 根据gimbal的反馈值计算云台和底盘正方向的夹角,不需要传参,通过static私有变量完成
     CalcOffsetAngle();
     if (rc_data[TEMP].lost_flag == 0){
