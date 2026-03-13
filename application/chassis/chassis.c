@@ -290,7 +290,7 @@ void ChassisTask()
     // chassis_vx = chassis_cmd_recv.vx;
     // chassis_vx = chassis_cmd_recv.vx;//消除了云台速度对底盘速度的影响
     // chassis_vy = chassis_cmd_recv.vy;
-    tatic float sin_theta, cos_theta;
+    static float sin_theta, cos_theta;
     cos_theta = arm_cos_f32(chassis_cmd_recv.offset_angle * DEGREE_2_RAD);
     sin_theta = arm_sin_f32(chassis_cmd_recv.offset_angle * DEGREE_2_RAD);
     chassis_vy = chassis_cmd_recv.vx * sin_theta + chassis_cmd_recv.vy * cos_theta;  
