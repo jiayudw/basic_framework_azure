@@ -38,7 +38,7 @@ void RobotInit()
 
 #if defined(ONE_BOARD) || defined(CHASSIS_BOARD)
     ChassisInit();
-    ChassisMotorFeedbackInit();
+    //ChassisMotorFeedbackInit();
 #endif
 
     OSTaskInit(); // 创建基础任务
