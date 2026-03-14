@@ -24,9 +24,9 @@
 #include "arm_math.h"
 #include "bsp_log.h"
 //添加功率控制头文件
-#include "power_meter.h"
-PIDInstance power_pid;
-PID_Init_Config_s power_pid_config;
+// #include "power_meter.h"
+// PIDInstance power_pid;
+// PID_Init_Config_s power_pid_config;
 
 
 /* 根据robot_def.h中的macro自动计算的参数 */
@@ -51,7 +51,7 @@ static Chassis_Upload_Data_s chassis_feedback_data; // 底盘回传的反馈数�
 static referee_info_t* referee_data; // 用于获取裁判系统的数据
 static Referee_Interactive_info_t ui_data; // UI数据，将底盘中的数据传入此结构体的对应变量中，UI会自动检测是否变化，对应显示UI
 
-static SuperCapInstance *cap;                                       // 超级电容
+//static SuperCapInstance *cap;                                       // 超级电容
 static DJIMotorInstance *motor_lf, *motor_rf, *motor_lb, *motor_rb; // left right forward back
 
 /* 用于自旋变速策略的时间变量 */
@@ -175,7 +175,7 @@ static void LimitChassisOutput()
         // =========================================================
     // 1. 参数调优区 (常量定义，便于赛场快速修改)
     // =========================================================
-    const float MAX_WHEEL_SPEED = 8000.0f; // M3508电机的最大安全设定转速(根据实际PID整定修改)
+    const float MAX_WHEEL_SPEED = 21200.0f; // M3508电机的最大安全设定转速(根据实际PID整定修改)
     
     // 缓冲能量阈值
     const float BUF_WARN_THRES   = 60.0f;  // 开始轻微限制的阈值
@@ -301,7 +301,21 @@ void ChassisTask()
         // chassis_cmd_recv.wz = 0;
         break;
     case CHASSIS_FOLLOW_GIMBAL_YAW: // 跟随云台,不单独设置pid,以误差角度平方为速度输出
-        chassis_cmd_recv.wz = 1.5f * chassis_cmd_recv.offset_angle * abs(chassis_cmd_recv.offset_angle);
+        float wz_target = 1.5f * chassis_cmd_recv.offset_angle 
+                    * abs(chassis_cmd_recv.offset_angle);
+    
+        // 斜坡限制：每帧最多变化 50（根据任务频率调整）
+        const float WZ_RAMP = 30.0f;
+        static float wz_filtered = 0.0f;
+        
+        if (wz_target - wz_filtered > WZ_RAMP)
+            wz_filtered += WZ_RAMP;
+        else if (wz_target - wz_filtered < -WZ_RAMP)
+            wz_filtered -= WZ_RAMP;
+        else
+            wz_filtered = wz_target;
+        
+        chassis_cmd_recv.wz = wz_filtered;
         break;
     case CHASSIS_ROTATE: // 自旋,同时保持全向机动;当前wz维持定值,后续增加不规则的变速策略
         chassis_cmd_recv.wz = 2000;
@@ -337,25 +351,29 @@ void ChassisTask()
 
     // 推送反馈消息
 #ifdef ONE_BOARD
-    //chassis_feedback_data.chassis_power = referee_data->PowerHeatData.chassis_power;
-    chassis_feedback_data.chassis_power_limit = (float)referee_data->GameRobotState.chassis_power_limit;
-    chassis_feedback_data.buffer_energy = (float)referee_data->PowerHeatData.buffer_energy;
+    if (referee_data != NULL)
+{
+    chassis_feedback_data.chassis_power_limit =
+        (float)referee_data->GameRobotState.chassis_power_limit;
+    chassis_feedback_data.buffer_energy =
+        (float)referee_data->PowerHeatData.buffer_energy;
+    chassis_feedback_data.shoot_heat =
+        (float)referee_data->PowerHeatData.shooter_17mm_1_barrel_heat;
+    chassis_feedback_data.shoot_heat_limit =
+        (float)referee_data->GameRobotState.shooter_barrel_heat_limit;
+    chassis_feedback_data.robot_HP =
+        referee_data->GameRobotState.current_HP;
+    chassis_feedback_data.initial_speed =
+        referee_data->ShootData.initial_speed;
+}
+// 速度反馈和消息推送不依赖裁判系统，放在 if 外面
+chassis_feedback_data.speed_vx = chassis_cmd_recv.vx;
+chassis_feedback_data.speed_vy = chassis_cmd_recv.vy;
+chassis_feedback_data.speed_wz = chassis_cmd_recv.wz;
 
-    chassis_feedback_data.shoot_heat = (float)referee_data->PowerHeatData.shooter_17mm_1_barrel_heat;
-    chassis_feedback_data.shoot_heat_limit = (float)referee_data->GameRobotState.shooter_barrel_heat_limit;
-    
-    chassis_feedback_data.robot_HP = referee_data->GameRobotState.current_HP;
+PubPushMessage(chassis_pub, (void *)&chassis_feedback_data);
+LimitChassisOutput();
 
-    //添加弹速反馈
-    chassis_feedback_data.initial_speed = referee_data->ShootData.initial_speed;
-    //添加底盘速度控制指令反馈代码
-    chassis_feedback_data.speed_vx = chassis_cmd_recv.vx;
-    chassis_feedback_data.speed_vy = chassis_cmd_recv.vy;
-    chassis_feedback_data.speed_wz = chassis_cmd_recv.wz;
-
-    PubPushMessage(chassis_pub, (void *)&chassis_feedback_data);
-    // 根据裁判系统的反馈数据和电容数据对输出限幅并设定闭环参考值
-    LimitChassisOutput();
 #endif
 #ifdef CHASSIS_BOARD
     CANCommSend(chasiss_can_comm, (void *)&chassis_feedback_data);

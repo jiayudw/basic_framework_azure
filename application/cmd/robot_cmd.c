@@ -260,8 +260,8 @@ static void RemoteControlSet()
         // 按照摇杆的输出大小进行角度增量,增益系数需调整
 
         // 底盘参数,目前没有加入小陀螺(调试似乎暂时没有必要),系数需要调整
-        chassis_cmd_send.vx = 20.0f * (float)rc_data[TEMP].rc.rocker_r1; // 右侧摇杆竖直方向控制x方向速度
-        chassis_cmd_send.vy = -20.0f * (float)rc_data[TEMP].rc.rocker_r_; // 右侧摇杆水平方向控制y方向速度
+        chassis_cmd_send.vx = 100.0f * (float)rc_data[TEMP].rc.rocker_r1; // 右侧摇杆竖直方向控制x方向速度
+        chassis_cmd_send.vy = -100.0f * (float)rc_data[TEMP].rc.rocker_r_; // 右侧摇杆水平方向控制y方向速度
 
     }
 // // ================= 3. 弹速切换逻辑 (拨轮向下) =================

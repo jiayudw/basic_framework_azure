@@ -6,8 +6,8 @@
 #include "robot_def.h"
 
 //添加功率控制头文件和变量
-#include "power_meter.h"
-power_meter_data_t *get_power_data;
+//#include "power_meter.h"
+//power_meter_data_t *get_power_data;
 // PIDInstance *power_pid_;
 
 static uint8_t idx = 0; // register idx,是该文件的全局电机索引,在注册时使用
@@ -238,9 +238,9 @@ void DJIMotorSetRef(DJIMotorInstance *motor, float ref)
     motor->motor_controller.pid_ref = ref;
 }
 //订阅者初始化
-void ChassisMotorFeedbackInit(){
-    motor_sub = SubRegister("chassis_feed", sizeof(Chassis_Upload_Data_s));
-};
+// void ChassisMotorFeedbackInit(){
+//     motor_sub = SubRegister("chassis_feed", sizeof(Chassis_Upload_Data_s));
+// };
 // 为所有电机实例计算三环PID,发送控制报文
 void DJIMotorControl()
 {
@@ -252,7 +252,7 @@ void DJIMotorControl()
     Motor_Controller_s *motor_controller;   // 电机控制器
     DJI_Motor_Measure_s *measure;           // 电机测量值
     float pid_measure, pid_ref;             // 电机PID测量值和设定值
-    SubGetMessage(motor_sub,&chassis_motor_feedback);
+    //SubGetMessage(motor_sub,&chassis_motor_feedback);
     // 遍历所有电机实例,进行串级PID的计算并设置发送报文的值
     for (size_t i = 0; i < idx; ++i)
     { // 减小访存开销,先保存指针引用
