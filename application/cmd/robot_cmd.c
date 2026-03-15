@@ -48,10 +48,11 @@ static Robot_Status_e robot_state; // 机器人整体工作状态
 
 
 
+
 void RobotCMDInit()
 {
     rc_data = RemoteControlInit(&huart3);   // 修改为对应串口,注意如果是自研板dbus协议串口需选用添加了反相器的那个
-    vision_recv_data = VisionInit(NULL); // 视觉通信串口
+    vision_recv_data = VisionInit(&huart1); // 视觉通信串口
     // vtm_data = VideoTransInit(&huart1);
     gimbal_cmd_pub = PubRegister("gimbal_cmd", sizeof(Gimbal_Ctrl_Cmd_s));
     gimbal_feed_sub = SubRegister("gimbal_feed", sizeof(Gimbal_Upload_Data_s));
@@ -75,9 +76,6 @@ void RobotCMDInit()
     cmd_can_comm = CANCommInit(&comm_conf);
 #endif // GIMBAL_BOARD
     gimbal_cmd_send.pitch = 0;
-    vision_recv_data->ACTION_DATA.pitch = 0;
-    vision_recv_data->ACTION_DATA.yaw = 0;
-    vision_recv_data->ACTION_DATA.distance = -1;
     // vision_recv_data->ACTION_DATA.fire_times = 0;
     shoot_cmd_send.shoot_mode = SHOOT_OFF;
     shoot_cmd_send.load_mode = LOAD_STOP;
@@ -149,7 +147,7 @@ static void CalcOffsetAngle()
 // int16_t CalcNowYawDirection (){
 //         // 别名angle提高可读性,不然太长了不好看,虽然基本不会动这个函数
 //     static float angle;
-//     angle = gimbal_fetch_data.yaw_motor_single_round_angle; // 从云台获取的当前yaw电机单圈角度
+//     angle = gimbal_fetch_data. _single_round_angle; // 从云台获取的当前yaw电机单圈角度
 // #if YAW_ECD_GREATER_THAN_4096                               // 如果大于180度
 //     if (angle > YAW_ALIGN_ANGLE)
 //         chassis_cmd_send.offset_angle = angle - YAW_ALIGN_ANGLE;
@@ -195,12 +193,9 @@ static void RemoteControlSet()
     // 左侧开关状态为[下],遥控器控制下启动视觉调试
     //后续启动视觉，先到当前位置，如果识别到才瞄准
     if (switch_is_down(rc_data[TEMP].rc.switch_left))
-    {   if( vision_recv_data->ACTION_DATA.distance != -1){
-        gimbal_cmd_send.yaw = vision_recv_data->ACTION_DATA.yaw;
-        gimbal_cmd_send.pitch =vision_recv_data->ACTION_DATA.pitch;
-    }else{
-        chassis_cmd_send.vx = 20.0f * (float)rc_data[TEMP].rc.rocker_r1; // 右侧摇杆竖直方向控制x方向速度
-        chassis_cmd_send.vy = -20.0f * (float)rc_data[TEMP].rc.rocker_r_; // 右侧摇杆水平方向控制y方向速度
+    {   
+        chassis_cmd_send.vx = 10.0f * (float)rc_data[TEMP].rc.rocker_r1; // 右侧摇杆竖直方向控制x方向速度
+        chassis_cmd_send.vy = 10.0f * (float)rc_data[TEMP].rc.rocker_r_; // 右侧摇杆水平方向控制y方向速度
         gimbal_cmd_send.yaw -= 0.005f * (float)rc_data[TEMP].rc.rocker_l_;
         gimbal_cmd_send.pitch += 0.001f * (float)rc_data[TEMP].rc.rocker_l1;
         if (gimbal_cmd_send.pitch > PITCH_MAX_ANGLE)
@@ -211,7 +206,51 @@ static void RemoteControlSet()
         {
             gimbal_cmd_send.pitch = PITCH_MIN_ANGLE;
         }
+        if (gimbal_cmd_send.yaw > 180)
+        {
+            gimbal_cmd_send.yaw = 180;
+        }
+        if (gimbal_cmd_send.yaw < -180)
+        {
+            gimbal_cmd_send.yaw = -180;
+        }
+
     }
+    //左中间为视觉控制,直接给定速度和角度增量,不需要遥控器的输入
+    else if (switch_is_mid(rc_data[TEMP].rc.switch_left)){
+        chassis_cmd_send.vx = vision_recv_data->ACTION_DATA.vx * 14000;
+        chassis_cmd_send.vy = vision_recv_data->ACTION_DATA.vy * 14000;
+        chassis_cmd_send.wz = vision_recv_data->ACTION_DATA.wz * 183.0f * 4.62;
+        gimbal_cmd_send.yaw -= vision_recv_data->ACTION_DATA.yaw*57.2958f;
+        gimbal_cmd_send.pitch -= vision_recv_data->ACTION_DATA.pitch*57.2958f;
+        if (gimbal_cmd_send.pitch > PITCH_MAX_ANGLE)
+        {
+            gimbal_cmd_send.pitch = PITCH_MAX_ANGLE;
+        }
+        if (gimbal_cmd_send.pitch < PITCH_MIN_ANGLE)
+        {
+            gimbal_cmd_send.pitch = PITCH_MIN_ANGLE;
+        }
+    }
+
+    // if (switch_is_down(rc_data[TEMP].rc.switch_left))
+    // {   if( vision_recv_data->ACTION_DATA.distance != -1){
+    //     gimbal_cmd_send.yaw = vision_recv_data->ACTION_DATA.yaw;
+    //     gimbal_cmd_send.pitch =vision_recv_data->ACTION_DATA.pitch;
+    // }else{
+    //     chassis_cmd_send.vx = 20.0f * (float)rc_data[TEMP].rc.rocker_r1; // 右侧摇杆竖直方向控制x方向速度
+    //     chassis_cmd_send.vy = -20.0f * (float)rc_data[TEMP].rc.rocker_r_; // 右侧摇杆水平方向控制y方向速度
+    //     gimbal_cmd_send.yaw -= 0.005f * (float)rc_data[TEMP].rc.rocker_l_;
+    //     gimbal_cmd_send.pitch += 0.001f * (float)rc_data[TEMP].rc.rocker_l1;
+    //     if (gimbal_cmd_send.pitch > PITCH_MAX_ANGLE)
+    //     {
+    //         gimbal_cmd_send.pitch = PITCH_MAX_ANGLE;
+    //     }
+    //     if (gimbal_cmd_send.pitch < PITCH_MIN_ANGLE)
+    //     {
+    //         gimbal_cmd_send.pitch = PITCH_MIN_ANGLE;
+    //     }
+    // }
 
         // shoot_cmd_send.shoot_num = vision_recv_data->ACTION_DATA.fire_times;
         // if (shoot_cmd_send.shoot_num == 1)
@@ -245,24 +284,24 @@ static void RemoteControlSet()
         //     chassis_cmd_send.vy = -0;
         //     chassis_cmd_send.wz = 0;
         // }
-    } else {
-        gimbal_cmd_send.yaw -= 0.005f * (float)rc_data[TEMP].rc.rocker_l_;
-        gimbal_cmd_send.pitch += 0.001f * (float)rc_data[TEMP].rc.rocker_l1;
-        if (gimbal_cmd_send.pitch > PITCH_MAX_ANGLE)
-        {
-            gimbal_cmd_send.pitch = PITCH_MAX_ANGLE;
-        }
-        if (gimbal_cmd_send.pitch < PITCH_MIN_ANGLE)
-        {
-            gimbal_cmd_send.pitch = PITCH_MIN_ANGLE;
-        }
-        // 按照摇杆的输出大小进行角度增量,增益系数需调整
+    // } else {
+    //     gimbal_cmd_send.yaw -= 0.005f * (float)rc_data[TEMP].rc.rocker_l_;
+    //     gimbal_cmd_send.pitch += 0.001f * (float)rc_data[TEMP].rc.rocker_l1;
+    //     if (gimbal_cmd_send.pitch > PITCH_MAX_ANGLE)
+    //     {
+    //         gimbal_cmd_send.pitch = PITCH_MAX_ANGLE;
+    //     }
+    //     if (gimbal_cmd_send.pitch < PITCH_MIN_ANGLE)
+    //     {
+    //         gimbal_cmd_send.pitch = PITCH_MIN_ANGLE;
+    //     }
+    //     // 按照摇杆的输出大小进行角度增量,增益系数需调整
 
-        // 底盘参数,目前没有加入小陀螺(调试似乎暂时没有必要),系数需要调整
-        chassis_cmd_send.vx = 20.0f * (float)rc_data[TEMP].rc.rocker_r1; // 右侧摇杆竖直方向控制x方向速度
-        chassis_cmd_send.vy = -20.0f * (float)rc_data[TEMP].rc.rocker_r_; // 右侧摇杆水平方向控制y方向速度
+    //     // 底盘参数,目前没有加入小陀螺(调试似乎暂时没有必要),系数需要调整
+    //     chassis_cmd_send.vx = 20.0f * (float)rc_data[TEMP].rc.rocker_r1; // 右侧摇杆竖直方向控制x方向速度
+    //     chassis_cmd_send.vy = -20.0f * (float)rc_data[TEMP].rc.rocker_r_; // 右侧摇杆水平方向控制y方向速度
 
-    }
+    // }
 // // ================= 3. 弹速切换逻辑 (拨轮向下) =================
     static uint8_t bullet_speed_index = 1;  // 默认18m/s (index=1)
     static int16_t last_dial = 0;           // 上一次拨轮值

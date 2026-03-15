@@ -27,7 +27,7 @@
 /* 机器人重要参数定义,注意根据不同机器人进行修改,浮点数需要以.0或f结尾,无符号以u结尾 */
 // 云台参数
 // #define YAWECD_CHASSIS_ALIGN_ 642  // 云台和底盘对齐指向相同方向时的电机编码器值,若对云台有机械改动需要修改 //原始脉冲 (292) - (YAW_CHASSIS_ALIGN_ECD * 360 / 8192) = 0
-#define YAW_CHASSIS_ALIGN_ECD 6862
+#define YAW_CHASSIS_ALIGN_ECD 4874
 #define YAW_ECD_GREATER_THAN_4096 0 // ALIGN_ECD值是否大于4096,是为1,否为0;用于计算云台偏转角度
 #define PITCH_HORIZON_ECD 3412      // 云台处于水平位置时编码器值,若对云台有机械改动需要修改
 #define PITCH_MAX_ANGLE 0           // 云台竖直方向最大角度 (注意反馈如果是陀螺仪，则填写陀螺仪的角度)
@@ -84,9 +84,9 @@ typedef enum
  */
 typedef enum
 {
-    CHASSIS_ZERO_FORCE = 1,    // 电流零输入
+    CHASSIS_ZERO_FORCE = 0,    // 电流零输入
     CHASSIS_ROTATE = 2,            // 小陀螺模式
-    CHASSIS_NO_FOLLOW = 0,         // 不跟随，允许全向平移
+    CHASSIS_NO_FOLLOW = 1,         // 不跟随，允许全向平移
     CHASSIS_FOLLOW_GIMBAL_YAW = 3, // 跟随模式，底盘叠加角度环控制
 } chassis_mode_e;
 

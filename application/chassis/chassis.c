@@ -166,14 +166,14 @@ void ChassisInit()
  */
 static void MecanumCalculate()
 {
-    // vt_lf =  chassis_vx - chassis_vy - chassis_cmd_recv.wz * LF_CENTER;
-    // vt_rf =  chassis_vx + chassis_vy + chassis_cmd_recv.wz * RF_CENTER;
-    // vt_lb =  chassis_vx + chassis_vy - chassis_cmd_recv.wz * LB_CENTER;
-    // vt_rb =  chassis_vx - chassis_vy + chassis_cmd_recv.wz * RB_CENTER;
-    vt_lf =  chassis_vx - chassis_vy ;
-    vt_rf =  chassis_vx + chassis_vy ;
-    vt_lb =  chassis_vx + chassis_vy ;
-    vt_rb =  chassis_vx - chassis_vy ;
+    vt_lf =  chassis_vx - chassis_vy - chassis_cmd_recv.wz * LF_CENTER;
+    vt_rf =  chassis_vx + chassis_vy + chassis_cmd_recv.wz * RF_CENTER;
+    vt_lb =  chassis_vx + chassis_vy - chassis_cmd_recv.wz * LB_CENTER;
+    vt_rb =  chassis_vx - chassis_vy + chassis_cmd_recv.wz * RB_CENTER;
+    // vt_lf =  chassis_vx - chassis_vy -;
+    // vt_rf =  chassis_vx + chassis_vy ;
+    // vt_lb =  chassis_vx + chassis_vy ;
+    // vt_rb =  chassis_vx - chassis_vy ;
 }
 
 /**

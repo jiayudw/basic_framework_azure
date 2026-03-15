@@ -39,7 +39,6 @@ volatile float debug_pitch_angle_Kd = 0.8f;
 volatile float debug_pitch_speed_Kp = 50.0f;
 volatile float debug_pitch_speed_Ki = 350.0f;
 volatile float debug_pitch_speed_Kd = 0.0f;
-//这我用来方便ozone调参数的，别动！
 static float x,y;
 void GimbalInit()
 {
@@ -235,6 +234,7 @@ void GimbalTask()
     vision_send_data.x = x;
     vision_send_data.y = y;
     gimbal_feedback_data.gimbal_imu_data = *gimba_IMU_data;
+    gimbal_feedback_data.yaw_motor_single_round_angle = yaw_motor->measure.angle_single_round;
     vision_send_data.pitch = gimbal_feedback_data.gimbal_imu_data.Pitch;
     vision_send_data.yaw = gimbal_feedback_data.gimbal_imu_data.Yaw;   
     vision_send_data.roll = gimbal_feedback_data.gimbal_imu_data.Roll;
