@@ -75,7 +75,7 @@ void RobotCMDInit()
     };
     cmd_can_comm = CANCommInit(&comm_conf);
 #endif // GIMBAL_BOARD
-    gimbal_cmd_send.pitch = 0;
+    gimbal_cmd_send.pitch = PITCH_MIN_ANGLE;
     vision_recv_data->ACTION_DATA.pitch = 0;
     vision_recv_data->ACTION_DATA.yaw = 0;
     vision_recv_data->ACTION_DATA.distance = -1;
@@ -199,9 +199,11 @@ static void RemoteControlSet()
     {   if( vision_recv_data->ACTION_DATA.distance != -1){
         gimbal_cmd_send.yaw = vision_recv_data->ACTION_DATA.yaw;
         gimbal_cmd_send.pitch =vision_recv_data->ACTION_DATA.pitch;
+        chassis_cmd_send.vx = +20.0f * (float)rc_data[TEMP].rc.rocker_r1; // 右侧摇杆竖直方向控制x方向速度
+        chassis_cmd_send.vy = -20.0f * (float)rc_data[TEMP].rc.rocker_r_; // 右侧摇杆水平方向控制y方向速度
     }else{
-        chassis_cmd_send.vx = -20.0f * (float)rc_data[TEMP].rc.rocker_r1; // 右侧摇杆竖直方向控制x方向速度
-        chassis_cmd_send.vy = +20.0f * (float)rc_data[TEMP].rc.rocker_r_; // 右侧摇杆水平方向控制y方向速度
+        chassis_cmd_send.vx = +20.0f * (float)rc_data[TEMP].rc.rocker_r1; // 右侧摇杆竖直方向控制x方向速度
+        chassis_cmd_send.vy = -20.0f * (float)rc_data[TEMP].rc.rocker_r_; // 右侧摇杆水平方向控制y方向速度
         gimbal_cmd_send.yaw -= 0.005f * (float)rc_data[TEMP].rc.rocker_l_;
         gimbal_cmd_send.pitch += 0.001f * (float)rc_data[TEMP].rc.rocker_l1;
         if (gimbal_cmd_send.pitch > PITCH_MAX_ANGLE)
@@ -365,8 +367,8 @@ static void MouseKeySet()
     {
         // 如果没按右键，则使用鼠标移动量控制云台增量
         // 鼠标的 X 对应 Yaw 轴 (左右)，Y 对应 Pitch 轴 (上下)
-        gimbal_cmd_send.yaw   -= 0.005f * (float)vtm_data->mouse.x; 
-        gimbal_cmd_send.pitch += 0.005f * (float)vtm_data->mouse.y; 
+        gimbal_cmd_send.yaw   -= 0.001f * (float)vtm_data->mouse.x; 
+        gimbal_cmd_send.pitch += 0.001f * (float)vtm_data->mouse.y; 
 
         // 软件限幅，防止云台抬头或低头卡死
         if (gimbal_cmd_send.pitch > PITCH_MAX_ANGLE)
@@ -376,7 +378,7 @@ static void MouseKeySet()
     }
 
 
-    // ================= 3. 发射机构控制 (鼠标左键控制) =================
+   // ================= 3. 发射机构控制 (鼠标左键控制) =================
     shoot_cmd_send.lid_mode = LID_OPEN; // 默认打开弹舱盖
 
     // 定义一个静态变量，用来记录按住左键的时间（调用次数）
@@ -385,55 +387,63 @@ static void MouseKeySet()
     // 设定阈值：由于 CMD 任务假设是 200Hz（5ms执行一次）
     // 比如：设定按住超过 300 毫秒 (300 / 5 = 60次) 就算长按连发
     const uint16_t LONG_PRESS_THRESHOLD = 60; 
-
-    if (shoot_cmd_send.friction_mode == FRICTION_ON) 
+    // ===【Q键反转逻辑：优先级最高，按下Q直接反转清弹】===
+    if (vtm_data->key.q == 1)
     {
-        if (vtm_data->mouse.press_l == 1) 
+        // Q键按住期间，强制覆盖所有射击状态为反转
+        left_mouse_press_time = 0; // 同时清零左键计时器，防止松开Q后立刻误触发连发
+        shoot_cmd_send.friction_mode = FRICTION_ON;
+        shoot_cmd_send.shoot_mode    = SHOOT_ON;
+        shoot_cmd_send.load_mode     = LOAD_REVERSE;
+        shoot_cmd_send.shoot_rate    = 4; // 反转速度，可调
+        shoot_cmd_send.bullet_speed  = SMALL_AMU_15;
+    }
+    // ===【F键摩擦轮已开启，才允许正向射击逻辑】===
+    else if (shoot_cmd_send.friction_mode == FRICTION_ON)
+    {
+        if (vtm_data->mouse.press_l == 1)
         {
-            // 只要按住，计时器就开始累加
-            if (left_mouse_press_time < 60000) { // 防止 uint16 溢出
+            if (left_mouse_press_time < 60000) {
                 left_mouse_press_time++;
             }
 
-            if (left_mouse_press_time < LONG_PRESS_THRESHOLD) 
+            if (left_mouse_press_time < LONG_PRESS_THRESHOLD)
             {
-                // 【情况A：刚按下去，还没超过长按阈值】 -> 触发单发
+                // 【短按】单发
                 shoot_cmd_send.shoot_mode = SHOOT_ON;
-                shoot_cmd_send.load_mode  = LOAD_1_BULLET; // 只发一颗
-                shoot_cmd_send.bullet_speed = SMALL_AMU_15; 
+                shoot_cmd_send.load_mode  = LOAD_1_BULLET;
+                shoot_cmd_send.bullet_speed = SMALL_AMU_15;
             }
-            else 
+            else
             {
-                // 【情况B：按住不放，时间超过了阈值】 -> 切换为连发
+                // 【长按】连发
                 shoot_cmd_send.shoot_mode = SHOOT_ON;
-                shoot_cmd_send.load_mode  = LOAD_BURSTFIRE; // 开启连发
+                shoot_cmd_send.load_mode  = LOAD_BURSTFIRE;
                 shoot_cmd_send.shoot_rate = shoot_frequency;
-                shoot_cmd_send.bullet_speed = SMALL_AMU_15; 
+                shoot_cmd_send.bullet_speed = SMALL_AMU_15;
             }
         }
-        else 
+        else
         {
-            // 如果松开了鼠标，必须【清零计时器】，并停止射击
+            // 松开左键，清零并停止
             left_mouse_press_time = 0;
-            
             shoot_cmd_send.shoot_mode = SHOOT_OFF;
             shoot_cmd_send.load_mode  = LOAD_STOP;
         }
     }
-    else 
+    else
     {
-        // 摩擦轮没开，强制停止发射并清零时间
+        // 摩擦轮没开，强制停止
         left_mouse_press_time = 0;
         shoot_cmd_send.shoot_mode = SHOOT_OFF;
         shoot_cmd_send.load_mode  = LOAD_STOP;
     }
-
     // ================= 4. 底盘控制 (由键盘 W, A, S, D 控制) =================
     float vx_set = 0.0f;
     float vy_set = 0.0f;
     
     // 设置底盘基础移动速度
-    float chassis_base_speed = 3000.0f; 
+    float chassis_base_speed = 5000.0f; 
 
     // 如果按下 Shift 键，实现加速（冲刺模式）
     if (vtm_data->key.shift == 1) {
@@ -453,7 +463,7 @@ static void MouseKeySet()
         vy_set = -chassis_base_speed;
 
     // 赋值给底盘发送结构体
-    chassis_cmd_send.vx = vx_set;
+    chassis_cmd_send.vx = +vx_set;
     chassis_cmd_send.vy = -vy_set;
 }
 
