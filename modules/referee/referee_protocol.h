@@ -100,33 +100,34 @@ typedef enum
 /* 命令码数据段长 */
 typedef enum
 {
-    LEN_game_state = 11,				   // 0x0001
-    LEN_game_result = 1,				   // 0x0002
-    LEN_game_robot_HP = 32,				   // 0x0003
-    LEN_event_data = 4,					   // 0x0101
-    LEN_referee_warning = 3,               // 0x0104
-    LEN_dart_info = 3,					   // 0x0105
-    LEN_game_robot_state = 13,			   // 0x0201
-    LEN_power_heat_data = 16,			   // 0x0202
-    LEN_game_robot_pos = 16,			   // 0x0203
-    LEN_buff_musk = 7,					   // 0x0204 
-    LEN_robot_hurt = 1,					   // 0x0206
-    LEN_shoot_data = 7,					   // 0x0207
-    LEN_shoot_num = 8,					   // 0x0208 (协议加入了堡垒增益，长8字节)
-    LEN_rfid_status = 4,				   // 0x0209
-    LEN_dart_client_cmd = 6,               // 0x020A
-    LEN_ground_robot_pos = 40,             // 0x020B
-    LEN_radar_mark_data = 1,               // 0x020C
-    LEN_sentry_info = 6,                   // 0x020D
-    LEN_radar_info = 1,                    // 0x020E
+    LEN_game_state = 11,               // 0x0001
+    LEN_game_result = 1,               // 0x0002
+    LEN_game_robot_HP = 16,            // 0x0003 (修正: 32 -> 16)
+    LEN_event_data = 4,                // 0x0101
+    LEN_referee_warning = 3,           // 0x0104
+    LEN_dart_info = 3,                 // 0x0105
+    LEN_game_robot_state = 13,         // 0x0201
+    LEN_power_heat_data = 14,          // 0x0202 (修正: 16 -> 14)
+    LEN_game_robot_pos = 16,           // 0x0203 (注：官方表1-4标为16，但实际结构体内容为12)
+    LEN_buff_musk = 8,                 // 0x0204 (修正: 7 -> 8)
+    LEN_robot_hurt = 1,                // 0x0206
+    LEN_shoot_data = 7,                // 0x0207
+    LEN_shoot_num = 8,                 // 0x0208 (注：官方表1-4中长度标为6，但表1-17实际载荷为8)
+    LEN_rfid_status = 5,               // 0x0209 (修正: 4 -> 5)
+    LEN_dart_client_cmd = 6,           // 0x020A
+    LEN_ground_robot_pos = 40,         // 0x020B
+    LEN_radar_mark_data = 2,           // 0x020C (修正: 1 -> 2)
+    LEN_sentry_info = 6,               // 0x020D
+    LEN_radar_info = 1,                // 0x020E
     
-    // LEN_sentry_dee_data = 127,			   // 0x0301
-    // LEN_custom_robot_data = 30,			   // 0x0302
-    // LEN_map_command = 15,                  // 0x0303
-    // LEN_custom_client_data = 8,			   // 0x0306
-    // LEN_robot_custom_data = 30,			   // 0x0309
-    // LEN_robot_custom_data_2 = 300,		   // 0x0310
-    // LEN_robot_custom_data_3 = 30,		   // 0x0311
+    // 以下为交互类数据长度（可根据需要解除注释）
+    // LEN_sentry_dee_data = 127,      // 0x0301
+    // LEN_custom_robot_data = 30,     // 0x0302
+    // LEN_map_command = 15,           // 0x0303
+    // LEN_custom_client_data = 8,     // 0x0306
+    // LEN_robot_custom_data = 30,     // 0x0309
+    // LEN_robot_custom_data_2 = 300,  // 0x0310
+    // LEN_robot_custom_data_3 = 30,   // 0x0311
 } JudgeDataLength_e;
 
 /****************************接收数据的详细说明****************************/
@@ -146,27 +147,18 @@ typedef struct
     uint8_t winner;
 } game_result_t;
 
-/* ID: 0x0003  Byte:  32    比赛机器人血量数据 */
+/* ID: 0x0003  Byte: 16    比赛机器人血量数据 (修改：只包含己方血量) */
 typedef struct
 {
-    uint16_t red_1_robot_HP; 
-    uint16_t red_2_robot_HP; 
-    uint16_t red_3_robot_HP; 
-    uint16_t red_4_robot_HP; 
-    uint16_t reserved1; 
-    uint16_t red_7_robot_HP; 
-    uint16_t red_outpost_HP; 
-    uint16_t red_base_HP; 
-    uint16_t blue_1_robot_HP; 
-    uint16_t blue_2_robot_HP; 
-    uint16_t blue_3_robot_HP; 
-    uint16_t blue_4_robot_HP; 
-    uint16_t reserved2; 
-    uint16_t blue_7_robot_HP; 
-    uint16_t blue_outpost_HP; 
-    uint16_t blue_base_HP;
+    uint16_t ally_1_robot_HP; 
+    uint16_t ally_2_robot_HP; 
+    uint16_t ally_3_robot_HP; 
+    uint16_t ally_4_robot_HP; 
+    uint16_t reserved; 
+    uint16_t ally_7_robot_HP; 
+    uint16_t ally_outpost_HP; 
+    uint16_t ally_base_HP;
 } game_robot_HP_t;
-
 /* ID: 0x0101  Byte:  4    场地事件数据 */
 typedef struct
 {
@@ -203,15 +195,14 @@ typedef struct
     uint8_t power_management_shooter_output : 1;
 } robot_status_t;
 
-/* ID: 0X0202  Byte: 16    实时底盘缓冲能量和射击热量数据 */
+/* ID: 0X0202  Byte: 14    实时底盘缓冲能量和射击热量数据 (修改：合并17mm热量) */
 typedef struct 
 { 
     uint16_t reserved1; 
     uint16_t reserved2; 
     float reserved3; 
     uint16_t buffer_energy; 
-    uint16_t shooter_17mm_1_barrel_heat; 
-    uint16_t shooter_17mm_2_barrel_heat; 
+    uint16_t shooter_17mm_barrel_heat; 
     uint16_t shooter_42mm_barrel_heat;
 } power_heat_data_t;
 
@@ -223,11 +214,11 @@ typedef struct
     float angle;
 } robot_pos_t;
 
-/* ID: 0x0204  Byte:  7    机器人增益和底盘能量数据 */
+/* ID: 0x0204  Byte:  8    机器人增益和底盘能量数据 (修改：cooling_buff 变为 uint16_t) */
 typedef struct
 {
     uint8_t recovery_buff;
-    uint8_t cooling_buff;
+    uint16_t cooling_buff; 
     uint8_t defence_buff;
     uint8_t vulnerability_buff;
     uint16_t attack_buff;
@@ -259,10 +250,11 @@ typedef struct
     uint16_t projectile_allowance_fortress;
 } projectile_allowance_t;
 
-/* ID: 0x0209  Byte:  4    RFID模块状态数据 */
+/* ID: 0x0209  Byte:  5    RFID模块状态数据 (修改：增加 rfid_status_2) */
 typedef struct
 {
     uint32_t rfid_status;
+    uint8_t rfid_status_2;
 } rfid_status_t;
 
 /* ID: 0x020A  Byte:  6    飞镖选手端指令数据 */
@@ -289,10 +281,10 @@ typedef struct
     float reserved2;
 } ground_robot_position_t;
 
-/* ID: 0x020C  Byte:  1    雷达标记进度数据 */
+/* ID: 0x020C  Byte:  2    雷达标记进度数据 (修改：mark_progress 变为 uint16_t) */
 typedef struct
 {
-    uint8_t mark_progress;
+    uint16_t mark_progress;
 } radar_mark_data_t;
 
 /* ID: 0x020D  Byte:  6    哨兵自主决策信息同步 */

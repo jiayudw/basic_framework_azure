@@ -267,7 +267,7 @@ void ChassisTask()
     chassis_feedback_data.chassis_power_limit = (float)referee_data->GameRobotState.chassis_power_limit;
     chassis_feedback_data.buffer_energy = (float)referee_data->PowerHeatData.buffer_energy;
 
-    chassis_feedback_data.shoot_heat = (float)referee_data->PowerHeatData.shooter_17mm_1_barrel_heat;
+    chassis_feedback_data.shoot_heat = (float)referee_data->PowerHeatData.shooter_17mm_barrel_heat;
     chassis_feedback_data.shoot_heat_limit = (float)referee_data->GameRobotState.shooter_barrel_heat_limit;
     
     chassis_feedback_data.robot_HP = referee_data->GameRobotState.current_HP;
