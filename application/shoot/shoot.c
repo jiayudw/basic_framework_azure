@@ -62,8 +62,8 @@ void ShootInit()
     // 拨盘电机
     Motor_Init_Config_s loader_config = {
         .can_init_config = {
-            .can_handle = &hcan2,
-            .tx_id = 3,
+            .can_handle = &hcan1,
+            .tx_id = 7,
         },
         .controller_param_init_config = {
             .angle_PID = {
@@ -95,7 +95,7 @@ void ShootInit()
             .angle_feedback_source = MOTOR_FEED, .speed_feedback_source = MOTOR_FEED,
             .outer_loop_type = SPEED_LOOP, // 初始化成SPEED_LOOP,让拨盘停在原地,防止拨盘上电时乱转
             .close_loop_type = ANGLE_LOOP | SPEED_LOOP | CURRENT_LOOP, 
-            .motor_reverse_flag = MOTOR_DIRECTION_NORMAL, // 注意方向设置为拨盘的拨出的击发方向
+            .motor_reverse_flag = MOTOR_DIRECTION_REVERSE, // 注意方向设置为拨盘的拨出的击发方向
         },
         .motor_type = M2006 // 英雄使用m3508
     };
@@ -180,7 +180,7 @@ void ShootTask()
             // 以当前测得的总角度为基准，每次多转固定角度
             float snapshot_angle = loader->measure.total_angle;
             // 注意正负方向，和你实际出弹方向保持一致
-            target_angle = snapshot_angle - ONE_BULLET_DELTA_ANGLE;
+            target_angle = snapshot_angle + ONE_BULLET_DELTA_ANGLE;
 
             DJIMotorSetRef(loader, target_angle);
 
@@ -267,16 +267,16 @@ void ShootTask()
         switch (shoot_cmd_recv.bullet_speed)
         {
         case SMALL_AMU_15:
-            DJIMotorSetRef(friction_l, -10000);
-            DJIMotorSetRef(friction_r, 10000);
+            DJIMotorSetRef(friction_l, 30000);
+            DJIMotorSetRef(friction_r, -30000);
             break;
         case SMALL_AMU_18:
-            DJIMotorSetRef(friction_l, 36000);
-            DJIMotorSetRef(friction_r, -36000);
+            DJIMotorSetRef(friction_l, -36000);
+            DJIMotorSetRef(friction_r, 36000);
             break;
         case SMALL_AMU_30:
-            DJIMotorSetRef(friction_l, 60000);
-            DJIMotorSetRef(friction_r, -60000);
+            DJIMotorSetRef(friction_l, -60000);
+            DJIMotorSetRef(friction_r, 60000);
             break;
         default: // 当前为了调试设定的默认值4000,因为还没有加入裁判系统无法读取弹速.
             DJIMotorSetRef(friction_l, 0);
