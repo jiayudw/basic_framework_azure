@@ -40,6 +40,7 @@ typedef struct
     shoot_data_t ShootData;                                                // 0x0207
     projectile_allowance_t ShootNumAndGoldCoin;                            // 0x0208
     rfid_status_t RFIDStatus;                                              // 0x0209
+	sentry_info_t SentryInfo; 											   // 0x020D                                            
     // Communicate_ReceiveData_t ReceiveData;  // 已注释，交互数据暂不使用
 
     uint8_t init_flag;

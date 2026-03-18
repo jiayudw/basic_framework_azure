@@ -201,7 +201,11 @@ static void JudgeReadData(uint8_t *buff)
 		case ID_rfid_status: // 0x0209    RFID状态数据
 		memcpy(&referee_info.RFIDStatus, (buff + DATA_Offset), LEN_rfid_status);
 		break;
-	}
+
+		case ID_sentry_info: // 0x020D    哨兵信息数据
+		memcpy(&referee_info.SentryInfo, (buff + DATA_Offset), LEN_sentry_info);
+		break;
+}
 				// case ID_student_interactive: // 0x0301   syhtodo接收代码未测试
 				// 	memcpy(&referee_info.ReceiveData, (buff + DATA_Offset), LEN_receive_data);
 				// 	break;
