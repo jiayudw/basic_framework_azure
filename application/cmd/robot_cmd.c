@@ -265,7 +265,7 @@ static void RemoteControlSet()
 
     }
 // // ================= 3. 弹速切换逻辑 (拨轮向下) =================
-    static uint8_t bullet_speed_index = 1;  // 默认18m/s (index=1)
+    static uint8_t bullet_speed_index = 0;  // 默认18m/s (index=1)
     static int16_t last_dial = 0;           // 上一次拨轮值
     
     int16_t curr_dial = rc_data[TEMP].rc.dial;  // 拨轮值, 范围 -660 ~ +660

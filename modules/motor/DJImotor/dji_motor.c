@@ -4,6 +4,15 @@
 #include "bsp_log.h"
 #include "message_center.h"
 #include "robot_def.h"
+/* ======================================================== */
+/* 专供 Ozone 抓取拨盘 (Loader) 单发 PID 波形的探针变量 */
+/* ======================================================== */
+float ozone_loader_angle_ref = 0.0f; // 角度环目标值 (期望停下的绝对角度)
+float ozone_loader_angle_fdb = 0.0f; // 角度环真实值 (当前的绝对角度)
+
+float ozone_loader_speed_ref = 0.0f; // 速度环目标值 (角度环计算输出的期望速度)
+float ozone_loader_speed_fdb = 0.0f; // 速度环真实值 (当前真实的旋转速度)
+float ozone_loader_current   = 0.0f; // 电流真实值 (观察是否因为卡弹导致憋大电流)
 
 //添加功率控制头文件和变量
 //#include "power_meter.h"
@@ -263,6 +272,11 @@ void DJIMotorControl()
         pid_ref = motor_controller->pid_ref; // 保存设定值,防止motor_controller->pid_ref在计算过程中被修改
         if (motor_setting->motor_reverse_flag == MOTOR_DIRECTION_REVERSE)
             pid_ref *= -1; // 设置反转
+        /* ================== 1. 截获角度环数据 ================== */
+        if (motor->motor_can_instance->can_handle == &hcan2 && motor->motor_can_instance->tx_id == 3) {
+            ozone_loader_angle_ref = pid_ref;              // 此时的 pid_ref 是最外层设定的目标角度
+            ozone_loader_angle_fdb = measure->total_angle; // 真实的总角度
+        }
 
         // pid_ref会顺次通过被启用的闭环充当数据的载体
         // 计算位置环,只有启用位置环且外层闭环为位置时会计算速度环输出
@@ -274,6 +288,12 @@ void DJIMotorControl()
                 pid_measure = measure->total_angle; // MOTOR_FEED,对total angle闭环,防止在边界处出现突跃
             // 更新pid_ref进入下一个环
             pid_ref = PIDCalculate(&motor_controller->angle_PID, pid_measure, pid_ref);
+        }
+        /* ================== 2. 截获速度环与电流数据 ================== */
+        if (motor->motor_can_instance->can_handle == &hcan2 && motor->motor_can_instance->tx_id == 3) {
+            ozone_loader_speed_ref = pid_ref;             // 角度环算出来的期望速度
+            ozone_loader_speed_fdb = measure->speed_aps;  // 真实转速
+            ozone_loader_current   = measure->real_current; // 真实电流
         }
 
         // 计算速度环,(外层闭环为速度或位置)且(启用速度环)时会计算速度环
