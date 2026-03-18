@@ -279,6 +279,9 @@ shoot_cmd_send.lid_mode = LID_OPEN;
         shoot_cmd_send.shoot_mode = SHOOT_ON;
         shoot_cmd_send.load_mode = LOAD_BURSTFIRE;
         shoot_cmd_send.shoot_rate = shoot_frequency;
+        // shoot_cmd_send.friction_mode = FRICTION_ON;
+        // shoot_cmd_send.shoot_mode = SHOOT_ON;
+        // shoot_cmd_send.load_mode = LOAD_REVERSE;
     } 
     else if (curr_dial < -100) { 
         // 【拨轮向上微推】：仅开启摩擦轮预热

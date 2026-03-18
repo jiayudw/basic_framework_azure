@@ -166,6 +166,7 @@ void ShootTask()
     case LOAD_1_BULLET:
     {
         DJIMotorOuterLoop(loader, ANGLE_LOOP);
+        static float smoothed_angle = 0; 
 
         // 冷却中：保持上一次目标角度，不再新增
         if (is_cooling_down)
@@ -182,17 +183,19 @@ void ShootTask()
             // 注意正负方向，和你实际出弹方向保持一致
             target_angle = snapshot_angle - ONE_BULLET_DELTA_ANGLE;
 
-            DJIMotorSetRef(loader, target_angle);
+            //DJIMotorSetRef(loader, target_angle);
+            smoothed_angle = snapshot_angle;
 
             hibernate_time = current_time;
             dead_time      = 150.0f;   // 按机械情况再调
             reverse_trigger = 0;
         }
-        else
-        {
-            // 按住不松的过程中，只维持目标
-            DJIMotorSetRef(loader, target_angle);
-        }
+        float smooth_factor = 0.08f; 
+        smoothed_angle += (target_angle - smoothed_angle) * smooth_factor;
+
+        // 此时喂给底层的不再是断崖式的突变，而是一条圆滑的指数衰减曲线
+        DJIMotorSetRef(loader, smoothed_angle);
+        
     }
     break;
 
