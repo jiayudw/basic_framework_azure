@@ -10,7 +10,7 @@
 #include "cmsis_os.h"
 
 static attitude_t *gimba_IMU_data; // 云台IMU数据
-static DJIMotorInstance *yaw_motor, *pitch_motor;
+DJIMotorInstance *yaw_motor, *pitch_motor; // wth
 static Publisher_t *gimbal_pub;                   // 云台应用消息发布者(云台反馈给cmd)
 static Subscriber_t *gimbal_sub;     // cmd控制消息订阅者
 static Gimbal_Upload_Data_s gimbal_feedback_data; // 回传给cmd的云台状态信息
@@ -229,8 +229,9 @@ void GimbalTask()
     sin_yaw = arm_sin_f32(gimbal_feedback_data.gimbal_imu_data.Yaw * DEGREE_2_RAD);
     float chassis_send_vx = cos_yaw * chassis_refe_data.speed_vx + sin_yaw * chassis_refe_data.speed_vy;
     float chassis_send_vy = -sin_yaw * chassis_refe_data.speed_vx + cos_yaw * chassis_refe_data.speed_vy;
-    x +=  chassis_send_vx*time_delta/10000.0f; // 目前没有多传感器融合的需求,frame_id暂时没什么用,先固定为0
-    y +=  chassis_send_vy*time_delta/10000.0f;
+
+    x +=  chassis_send_vx*time_delta/100.0f; // 目前没有多传感器融合的需求,frame_id暂时没什么用,先固定为0
+    y +=  chassis_send_vy*time_delta*10.8/100.0f;
     vision_send_data.x = x;
     vision_send_data.y = y;
     gimbal_feedback_data.gimbal_imu_data = *gimba_IMU_data;

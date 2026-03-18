@@ -178,37 +178,48 @@ void get_protocol_info(uint8_t *rx_buf, Vision_Recv_s *rx_data)         // 接�
     // rx_data->ACTION_DATA.fire_cmd = rx_buf[0];
     
     // [1-3] 开火,roll,nav 指令
-    if (rx_buf[28] == 0x00) { //自瞄
-        rx_data->ACTION_DATA.fire_cmd = rx_buf[1];
-        memcpy(&rx_data->ACTION_DATA.vx,      &rx_buf[16],  4);
-        memcpy(&rx_data->ACTION_DATA.vy,     &rx_buf[20], 4);
-        memcpy(&rx_data->ACTION_DATA.wz,     &rx_buf[24], 4);
-        memcpy(&rx_data->ACTION_DATA.distance,    &rx_buf[12],  4);
-        memcpy(&rx_data->ACTION_DATA.pitch,    &rx_buf[4],  4);
-        memcpy(&rx_data->ACTION_DATA.yaw,      &rx_buf[8],  4);
+    // if (rx_buf[28] == 0x00) { //自瞄
+    //     rx_data->ACTION_DATA.fire_cmd = rx_buf[1];
+    //     memcpy(&rx_data->ACTION_DATA.vx,      &rx_buf[16],  4);
+    //     memcpy(&rx_data->ACTION_DATA.vy,     &rx_buf[20], 4);
+    //     memcpy(&rx_data->ACTION_DATA.wz,     &rx_buf[24], 4);
+    //     memcpy(&rx_data->ACTION_DATA.distance,    &rx_buf[12],  4);
+    //     memcpy(&rx_data->ACTION_DATA.pitch,    &rx_buf[4],  4);
+    //     memcpy(&rx_data->ACTION_DATA.yaw,      &rx_buf[8],  4);
 
-    }
-    else if (rx_buf[28] == 0x01) { //导航
-        rx_data->ACTION_DATA.roll_cmd = rx_buf[2];
-        rx_data->ACTION_DATA.nav_cmd = rx_buf[3];
+    // }
+    // else if (rx_buf[28] == 0x01) { //导航
+    //     rx_data->ACTION_DATA.roll_cmd = rx_buf[2];
+    //     rx_data->ACTION_DATA.nav_cmd = rx_buf[3];
 
-        memcpy(&rx_data->ACTION_DATA.vx,      &rx_buf[16],  4);
-        memcpy(&rx_data->ACTION_DATA.vy,     &rx_buf[20], 4);
-        memcpy(&rx_data->ACTION_DATA.wz,     &rx_buf[24], 4);
-        memcpy(&rx_data->ACTION_DATA.pitch,    &rx_buf[4],  4);
-        memcpy(&rx_data->ACTION_DATA.yaw,      &rx_buf[8],  4);
-    }
-    else
-    {
+    //     memcpy(&rx_data->ACTION_DATA.vx,      &rx_buf[16],  4);
+    //     memcpy(&rx_data->ACTION_DATA.vy,     &rx_buf[20], 4);
+    //     memcpy(&rx_data->ACTION_DATA.wz,     &rx_buf[24], 4);
+    //     memcpy(&rx_data->ACTION_DATA.pitch,    &rx_buf[4],  4);
+    //     memcpy(&rx_data->ACTION_DATA.yaw,      &rx_buf[8],  4);
+    //     // memcpy(&rx_data->ACTION_DATA.distance,   &rx_buf[12],  4); //导航模式直接将distance赋值为-1,表示不处于自瞄状态
+    // }
+    // else
+    // {
 
-        memcpy(&rx_data->ACTION_DATA.vx,      &rx_buf[16],  4);
-        memcpy(&rx_data->ACTION_DATA.vy,     &rx_buf[20], 4);
-        memcpy(&rx_data->ACTION_DATA.wz,     &rx_buf[24], 4);
-        memcpy(&rx_data->ACTION_DATA.pitch,    &rx_buf[4],  4);
-        memcpy(&rx_data->ACTION_DATA.yaw,      &rx_buf[8],  4);
-        return; // 未知控制模式，丢弃数据
+    //     memcpy(&rx_data->ACTION_DATA.vx,      &rx_buf[16],  4);
+    //     memcpy(&rx_data->ACTION_DATA.vy,     &rx_buf[20], 4);
+    //     memcpy(&rx_data->ACTION_DATA.wz,     &rx_buf[24], 4);
+    //     memcpy(&rx_data->ACTION_DATA.pitch,    &rx_buf[4],  4);
+    //     memcpy(&rx_data->ACTION_DATA.yaw,      &rx_buf[8],  4);
+    //     return; // 未知控制模式，丢弃数据
 
-    }
+    // }
+    // wth
+    rx_data->ACTION_DATA.fire_cmd = rx_buf[1];
+    rx_data->ACTION_DATA.roll_cmd = rx_buf[2];
+    rx_data->ACTION_DATA.nav_cmd = rx_buf[3];
+    memcpy(&rx_data->ACTION_DATA.vx,      &rx_buf[16],  4);
+    memcpy(&rx_data->ACTION_DATA.vy,     &rx_buf[20], 4);
+    memcpy(&rx_data->ACTION_DATA.wz,     &rx_buf[24], 4);
+    memcpy(&rx_data->ACTION_DATA.distance,    &rx_buf[12],  4);
+    memcpy(&rx_data->ACTION_DATA.pitch,    &rx_buf[4],  4);
+    memcpy(&rx_data->ACTION_DATA.yaw,      &rx_buf[8],  4);
 }
 
 
