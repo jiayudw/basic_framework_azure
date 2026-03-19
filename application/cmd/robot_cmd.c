@@ -75,7 +75,7 @@ void RobotCMDInit()
     };
     cmd_can_comm = CANCommInit(&comm_conf);
 #endif // GIMBAL_BOARD
-    gimbal_cmd_send.pitch = PITCH_MIN_ANGLE;
+    gimbal_cmd_send.pitch = 0.0f;
     vision_recv_data->ACTION_DATA.pitch = 0;
     vision_recv_data->ACTION_DATA.yaw = 0;
     vision_recv_data->ACTION_DATA.distance = -1;
