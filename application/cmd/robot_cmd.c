@@ -367,7 +367,7 @@ static void MouseKeySet()
     {
         // 如果没按右键，则使用鼠标移动量控制云台增量
         // 鼠标的 X 对应 Yaw 轴 (左右)，Y 对应 Pitch 轴 (上下)
-        gimbal_cmd_send.yaw   -= 0.001f * (float)vtm_data->mouse.x; 
+        gimbal_cmd_send.yaw   -= 0.003f * (float)vtm_data->mouse.x; 
         gimbal_cmd_send.pitch += 0.001f * (float)vtm_data->mouse.y; 
 
         // 软件限幅，防止云台抬头或低头卡死
@@ -443,11 +443,11 @@ static void MouseKeySet()
     float vy_set = 0.0f;
     
     // 设置底盘基础移动速度
-    float chassis_base_speed = 5000.0f; 
+    float chassis_base_speed = 9000.0f; 
 
     // 如果按下 Shift 键，实现加速（冲刺模式）
     if (vtm_data->key.shift == 1) {
-        chassis_base_speed = 5000.0f; // 冲刺速度
+        chassis_base_speed = 12000.0f; // 冲刺速度
     }
 
     // 前后平移控制 (W / S)
