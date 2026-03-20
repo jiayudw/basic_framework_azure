@@ -74,7 +74,7 @@ static void JudgeReadData(uint8_t *buff)
         // SEGGER_RTT_WriteString(0, printf_buf);
         break;
 
-    case ID_game_robot_survivors: // 0x0003
+    case ID_game_robot_HP: // 0x0003
         memcpy(&referee_info.GameRobotHP, (buff + DATA_Offset), LEN_game_robot_HP);
         // 以下代码为调试用,读取裁判系统协议内机器人血量数据,并使用H7tools发送至电脑
         // SEGGER_RTT_SetTerminal(1); // 设置显示的终端
@@ -131,6 +131,11 @@ static void JudgeReadData(uint8_t *buff)
 
 	case ID_game_robot_state: // 0x0201
 		memcpy(&referee_info.GameRobotState, (buff + DATA_Offset), LEN_game_robot_state);
+		// 根据robot_id计算referee_id各字段
+		
+		referee_info.referee_id.Robot_ID    = referee_info.GameRobotState.robot_id;
+		referee_info.referee_id.Robot_Color = (referee_info.GameRobotState.robot_id > 9) ? Robot_Blue : Robot_Red;
+		referee_info.referee_id.Cilent_ID   = referee_info.GameRobotState.robot_id + 0x100; // 客户端ID = 机器人ID + 256
 		// 以下代码为调试用,读取裁判系统协议内机器人状态数据,并使用H7tools发送至电脑
 		// SEGGER_RTT_SetTerminal(1); // 设置显示的终端
 		// sprintf(printf_buf, "Robot ID=%d, Robot Level=%d, Current HP=%d, Max HP=%d, Shooter Barrel Cooling Value=%d, "
@@ -207,6 +212,13 @@ static void JudgeReadData(uint8_t *buff)
 
 	case ID_shoot_num: // 0x0208    射击次数
 		memcpy(&referee_info.ShootNumAndGoldCoin, (buff + DATA_Offset), LEN_shoot_num);
+		case ID_rfid_status: // 0x0209    RFID状态数据
+		memcpy(&referee_info.RFIDStatus, (buff + DATA_Offset), LEN_rfid_status);
+		break;
+
+		case ID_sentry_info: // 0x020D    哨兵信息数据
+		memcpy(&referee_info.SentryInfo, (buff + DATA_Offset), LEN_sentry_info);
+		break;
 		// 以下代码为调试用,读取裁判系统协议内发弹量数据,并使用H7tools发送至电脑
 		// SEGGER_RTT_SetTerminal(1); // 设置显示的终端
 		// sprintf(printf_buf, "Projectile Allowance 17mm=%d, Projectile Allowance 42mm=%d, Remaining Gold Coin=%d\r\n",
