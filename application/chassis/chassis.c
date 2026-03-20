@@ -10,7 +10,7 @@
  * @copyright Copyright (c) 2022
  *
  */
-
+#include "rm_referee.h" 
 #include "chassis.h"
 #include "robot_def.h"
 #include "dji_motor.h"
@@ -370,7 +370,7 @@ void ChassisTask()
 chassis_feedback_data.speed_vx = chassis_cmd_recv.vx;
 chassis_feedback_data.speed_vy = chassis_cmd_recv.vy;
 chassis_feedback_data.speed_wz = chassis_cmd_recv.wz;
-
+chassis_feedback_data.enemy_color = (referee_data->referee_id.Robot_Color == Robot_Red) ? Robot_Blue : Robot_Red;
 PubPushMessage(chassis_pub, (void *)&chassis_feedback_data);
 LimitChassisOutput();
 

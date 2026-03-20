@@ -203,6 +203,7 @@ typedef struct
     float speed_vx;
     float speed_vy;
     float speed_wz;
+    uint8_t enemy_color; // 1 for blue, 0 for red
 } Chassis_Upload_Data_s;
 
 
