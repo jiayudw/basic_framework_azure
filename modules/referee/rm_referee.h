@@ -25,6 +25,7 @@ typedef struct
 
     xFrameHeader FrameHeader; // 接收到的帧头信息
     uint16_t CmdID;
+
     game_status_t GameState;                                               // 0x0001  (原 game_state_t -> game_status_t)
     game_result_t GameResult;                                              // 0x0002
     game_robot_HP_t GameRobotHP;                                           // 0x0003
@@ -41,7 +42,6 @@ typedef struct
     rfid_status_t RFIDStatus;                                              // 0x0209
 	sentry_info_t SentryInfo; 											   // 0x020D                                            
     // Communicate_ReceiveData_t ReceiveData;  // 已注释，交互数据暂不使用
-
 
     uint8_t init_flag;
 
