@@ -11,7 +11,7 @@
 #include "referee_task.h"
 #include "robot_def.h"
 #include "rm_referee.h"
-#include "referee_UI.h"
+// #include "referee_UI.h"  // UI绘制已禁用
 #include "string.h"
 #include "cmsis_os.h"
 
@@ -20,6 +20,7 @@ static referee_info_t *referee_recv_info;            // 接收到的裁判系统
 uint8_t UI_Seq;                                      // 包序号，供整个referee文件使用
 // @todo 不应该使用全局变量
 
+#if 0 /* UI绘制已禁用 - DeterminRobotID 仅供UI使用 */
 /**
  * @brief  判断各种ID，选择客户端ID
  * @param  referee_info_t *referee_recv_info
@@ -34,10 +35,11 @@ static void DeterminRobotID()
     referee_recv_info->referee_id.Cilent_ID = 0x0100 + referee_recv_info->referee_id.Robot_ID; // 计算客户端ID
     referee_recv_info->referee_id.Receiver_Robot_ID = 0;
 }
+#endif /* UI绘制已禁用 */
 
-static void MyUIRefresh(referee_info_t *referee_recv_info, Referee_Interactive_info_t *_Interactive_data);
-static void UIChangeCheck(Referee_Interactive_info_t *_Interactive_data); // 模式切换检测
-static void RobotModeTest(Referee_Interactive_info_t *_Interactive_data); // 测试用函数，实现模式自动变化
+// static void MyUIRefresh(referee_info_t *referee_recv_info, Referee_Interactive_info_t *_Interactive_data);  // UI绘制已禁用
+// static void UIChangeCheck(Referee_Interactive_info_t *_Interactive_data); // UI绘制已禁用
+// static void RobotModeTest(Referee_Interactive_info_t *_Interactive_data); // UI绘制已禁用
 
 referee_info_t *UITaskInit(UART_HandleTypeDef *referee_usart_handle, Referee_Interactive_info_t *UI_data)
 {
@@ -49,18 +51,23 @@ referee_info_t *UITaskInit(UART_HandleTypeDef *referee_usart_handle, Referee_Int
 
 void UITask()
 {
-    RobotModeTest(Interactive_data); // 测试用函数，实现模式自动变化,用于检查该任务和裁判系统是否连接正常
-    MyUIRefresh(referee_recv_info, Interactive_data);
+    // UI绘制已禁用
+    // RobotModeTest(Interactive_data);
+    // MyUIRefresh(referee_recv_info, Interactive_data);
 }
 
-static Graph_Data_t UI_shoot_line[10]; // 射击准线
-static Graph_Data_t UI_Energy[3];      // 电容能量条
-static String_Data_t UI_State_sta[6];  // 机器人状态,静态只需画一次
-static String_Data_t UI_State_dyn[6];  // 机器人状态,动态先add才能change
-static uint32_t shoot_line_location[10] = {540, 960, 490, 515, 565};
+// static Graph_Data_t UI_shoot_line[10]; // 射击准线    // UI绘制已禁用
+// static Graph_Data_t UI_Energy[3];      // 电容能量条  // UI绘制已禁用
+// static String_Data_t UI_State_sta[6];  // 机器人状态,静态只需画一次  // UI绘制已禁用
+// static String_Data_t UI_State_dyn[6];  // 机器人状态,动态先add才能change  // UI绘制已禁用
+// static uint32_t shoot_line_location[10] = {540, 960, 490, 515, 565};  // UI绘制已禁用
 
 void MyUIInit()
 {
+    // UI绘制已禁用，直接退出任务
+    vTaskDelete(NULL);
+
+    /* ---- 以下为UI绘制代码，已禁用 ----
     if (!referee_recv_info->init_flag)
         vTaskDelete(NULL); // 如果没有初始化裁判系统则直接删除ui任务
     while (referee_recv_info->GameRobotState.robot_id == 0)
@@ -114,8 +121,10 @@ void MyUIInit()
     // 能量条初始状态
     UILineDraw(&UI_Energy[2], "sd6", UI_Graph_ADD, 8, UI_Color_Pink, 30, 720, 160, 1020, 160);
     UIGraphRefresh(&referee_recv_info->referee_id, 2, UI_Energy[1], UI_Energy[2]);
+    ---- 以上为UI绘制代码，已禁用 ---- */
 }
 
+#if 0 /* UI绘制已禁用 - RobotModeTest / MyUIRefresh / UIChangeCheck */
 // 测试用函数，实现模式自动变化,用于检查该任务和裁判系统是否连接正常
 static uint8_t count = 0;
 static uint16_t count1 = 0;
@@ -297,3 +306,4 @@ static void UIChangeCheck(Referee_Interactive_info_t *_Interactive_data)
         _Interactive_data->Chassis_last_Power_Data.chassis_power_mx = _Interactive_data->Chassis_Power_Data.chassis_power_mx;
     }
 }
+#endif /* UI绘制已禁用 */

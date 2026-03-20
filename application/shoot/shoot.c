@@ -82,7 +82,7 @@ void ShootInit()
                 .MaxOut = 15000,
             },
             .current_PID = {
-                .Kp = 0.7, // 0.7
+                .Kp = 0.8, // 0.7
                 .Ki = 0.08, // 0.1
                 .Kd = 0,
                 .Improve = PID_Integral_Limit,

@@ -7,7 +7,7 @@
 #include "bsp_log.h"
 #include "bmi088.h"
 #include "master_process.h"
-
+#include "rm_referee.h"
 static attitude_t *gimba_IMU_data; // 云台IMU数据
 static DJIMotorInstance *yaw_motor, *pitch_motor;
 static Publisher_t *gimbal_pub;                   // 云台应用消息发布者(云台反馈给cmd)
