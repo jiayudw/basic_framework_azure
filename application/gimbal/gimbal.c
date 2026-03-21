@@ -198,7 +198,8 @@ void GimbalTask()
     gimbal_feedback_data.gimbal_imu_data = *gimba_IMU_data;
     gimbal_feedback_data.yaw_motor_single_round_angle = yaw_motor->measure.angle_single_round;
     vision_send_data.sof = 'P';
-    vision_send_data.mode = 1;
+    vision_send_data.mode = chassis_refe_data.enemy_color;
+
     vision_send_data.roll  = gimbal_feedback_data.gimbal_imu_data.Roll;
     vision_send_data.pitch = gimbal_feedback_data.gimbal_imu_data.Pitch;
     vision_send_data.yaw = gimbal_feedback_data.gimbal_imu_data.Yaw;   
