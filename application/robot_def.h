@@ -28,7 +28,7 @@
 // 云台参数
 // #define YAWECD_CHASSIS_ALIGN_ 642  // 云台和底盘对齐指向相同方向时的电机编码器值,若对云台有机械改动需要修改 //原始脉冲 (292) - (YAW_CHASSIS_ALIGN_ECD * 360 / 8192) = 0
 // #define YAW_CHASSIS_ALIGN_ECD 4874
-#define YAW_CHASSIS_ALIGN_ECD 4874
+#define YAW_CHASSIS_ALIGN_ECD 1400
 #define YAW_ECD_GREATER_THAN_4096 0 // ALIGN_ECD值是否大于4096,是为1,否为0;用于计算云台偏转角度
 #define PITCH_HORIZON_ECD 3412      // 云台处于水平位置时编码器值,若对云台有机械改动需要修改
 #define PITCH_MAX_ANGLE 20           // 云台竖直方向最大角度 (注意反馈如果是陀螺仪，则填写陀螺仪的角度)
@@ -196,7 +196,8 @@ typedef struct
 
     // uint8_t rest_heat;           // 剩余枪口热量
     // Bullet_Speed_e bullet_speed; // 弹速限制
-    // Enemy_Color_e enemy_color;   // 0 for blue, 1 for red
+    Enemy_Color_e enemy_color;   // 1 for blue, 0 for red
+    // enemy_color
     float chassis_power;
     float buffer_energy;
     float shoot_heat;

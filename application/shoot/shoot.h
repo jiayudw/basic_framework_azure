@@ -13,4 +13,11 @@ void ShootInit();
  */
 void ShootTask();
 
+/**
+ * @brief 发射功率限制
+ * 
+ */
+void LimitShootPower();
+
+
 #endif // SHOOT_H

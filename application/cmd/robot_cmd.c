@@ -45,7 +45,9 @@ static Shoot_Ctrl_Cmd_s shoot_cmd_send;      // 传递给发射的控制信息
 static Shoot_Upload_Data_s shoot_fetch_data; // 从发射获取的反馈信息
 
 static Robot_Status_e robot_state; // 机器人整体工作状态
+static int16_t curr_dial = 0;  // 拨轮值, 范围 -660 ~ +660
 
+static int pitch_way=0;
 
 
 
@@ -83,6 +85,7 @@ void RobotCMDInit()
     shoot_cmd_send.friction_mode = FRICTION_OFF;
     shoot_cmd_send.bullet_speed = BULLET_SPEED_NONE;
     robot_state = ROBOT_READY; // 启动时机器人进入工作模式,后续加入所有应用初始化完成之后再进入
+
 }
 
 //用于转换电机的真实角度
@@ -144,6 +147,7 @@ static void CalcOffsetAngle()
     chassis_cmd_send.offset_angle = angle_diff;
 }
 
+
 // int16_t CalcNowYawDirection (){
 //         // 别名angle提高可读性,不然太长了不好看,虽然基本不会动这个函数
 //     static float angle;
@@ -196,12 +200,14 @@ static void RemoteControlSet()
     if (switch_is_down(rc_data[TEMP].rc.switch_left))
     {   
         chassis_cmd_send.vx = 50.0f * (float)rc_data[TEMP].rc.rocker_r1; // 右侧摇杆竖直方向控制x方向速度
-        chassis_cmd_send.vy = 50.0f * (float)rc_data[TEMP].rc.rocker_r_; // 右侧摇杆水平方向控制y方向速度
+        chassis_cmd_send.vy = -50.0f * (float)rc_data[TEMP].rc.rocker_r_; // 右侧摇杆水平方向控制y方向速度
         gimbal_cmd_send.yaw -= 0.005f * (float)rc_data[TEMP].rc.rocker_l_;
         // chassis_cmd_send.wz = (float)rc_data[TEMP].rc.rocker_l_;
 
         // gimbal_cmd_send.yaw = gimbal_fetch_data.yaw_motor_single_round_angle;
         gimbal_cmd_send.pitch += 0.001f * (float)rc_data[TEMP].rc.rocker_l1;
+        int16_t curr_dial = rc_data[TEMP].rc.dial;  // 拨轮值, 范围 -660 ~ +660
+
         if (gimbal_cmd_send.pitch > PITCH_MAX_ANGLE)
         {
             gimbal_cmd_send.pitch = PITCH_MAX_ANGLE;
@@ -216,12 +222,57 @@ static void RemoteControlSet()
     else if (switch_is_mid(rc_data[TEMP].rc.switch_left)){
         chassis_cmd_send.vx = vision_recv_data->ACTION_DATA.vx * 14000;
         chassis_cmd_send.vy = vision_recv_data->ACTION_DATA.vy * 18620;
+        int16_t curr_dial = rc_data[TEMP].rc.dial;  // 拨轮值, 范围 -660 ~ +660
+
         // chassis_cmd_send.wz = vision_recv_data->ACTION_DATA.wz * 183.0f * 4.62;
-        if(vision_recv_data->ACTION_DATA.distance >=0) //大于等于0意味着处于自瞄状态
+        if(vision_recv_data->ACTION_DATA.distance >0 || vision_recv_data->ACTION_DATA.distance == -1) //大于等于0意味着处于自瞄状态
         {
-             
-            gimbal_cmd_send.yaw = vision_recv_data->ACTION_DATA.yaw;// ACTION_DATA.yaw和gimbal_cmd_send.yaw的坐标系一致，都是上电那一刻确定的坐标系 
-            gimbal_cmd_send.pitch = vision_recv_data->ACTION_DATA.pitch;
+            curr_dial = -110;
+            shoot_cmd_send.friction_mode = FRICTION_ON;
+            chassis_cmd_send.chassis_mode = CHASSIS_ROTATE;
+            
+            double send_yaw_;
+            if(vision_recv_data->ACTION_DATA.distance > 0){
+                // gimbal_cmd_send.yaw = vision_recv_data->ACTION_DATA.yaw;// ACTION_DATA.yaw和gimbal_cmd_send.yaw的坐标系一致，都是上电那一刻确定的坐标系 
+                
+                
+                float d= vision_recv_data->ACTION_DATA.yaw - gimbal_cmd_send.yaw;
+                int d_n=(int)(d/360.0);
+                float angle_proc = vision_recv_data->ACTION_DATA.yaw - d_n*360; //abs<360
+                if (angle_proc-gimbal_cmd_send.yaw>180)
+                    angle_proc-=360;
+                else if(angle_proc-gimbal_cmd_send.yaw<-180)
+                    angle_proc+=360;
+                gimbal_cmd_send.yaw=angle_proc;
+                
+                gimbal_cmd_send.pitch = vision_recv_data->ACTION_DATA.pitch;
+            }
+            else if (vision_recv_data->ACTION_DATA.distance == -1){
+                gimbal_cmd_send.yaw += 0.05; //锁敌yaw//0.144
+                gimbal_cmd_send.pitch += 0.05*pitch_way; //0.2
+                if (gimbal_cmd_send.pitch > PITCH_MAX_ANGLE){
+                    gimbal_cmd_send.pitch = PITCH_MAX_ANGLE;
+                    pitch_way=-1;
+                }
+                if (gimbal_cmd_send.pitch < PITCH_MIN_ANGLE/2){
+                    gimbal_cmd_send.pitch = PITCH_MIN_ANGLE/2;
+                    pitch_way=1;
+                }
+                // if (gimbal_cmd_send.yaw > 360){
+                //     gimbal_cmd_send.yaw -= 360;
+                // }
+                // else if (gimbal_cmd_send.yaw <= 0 ){
+                //     gimbal_cmd_send.yaw += 360;
+                // }
+            // double d=send_yaw_-(int)(send_yaw_/360.0)
+            // gimbal_cmd_send.yaw=gimbal_cmd_send.yaw+d;
+            }
+            if (vision_recv_data->ACTION_DATA.fire_cmd == 1 ){
+                curr_dial = -600;
+            }
+            else if(vision_recv_data->ACTION_DATA.fire_cmd == 0 ){
+                curr_dial = -110;
+            }
 
             // gimbal_cmd_send.yaw = gimbal_fetch_data.yaw_motor_single_round_angle; // 会抖动的分离模式
             
@@ -231,7 +282,8 @@ static void RemoteControlSet()
         }
         else if(vision_recv_data->ACTION_DATA.distance == -2)//等于-2意味着处于导航状态，此时只响应ACTION_DATA.yaw，不响应ACTION_DATA.wz
         {
-            gimbal_cmd_send.yaw -= -vision_recv_data->ACTION_DATA.wz*28.5*23/100;// 原汁原味的分离模式, wz是速度，对速度积分,这个是给跟随云台yaw的参数
+            curr_dial = 0;
+            gimbal_cmd_send.yaw -= -vision_recv_data->ACTION_DATA.wz*28.5/100;// 原汁原味的分离模式, wz是速度，对速度积分,这个是给跟随云台yaw的参数
             
         }
         if (gimbal_cmd_send.pitch > PITCH_MAX_ANGLE)
@@ -317,7 +369,7 @@ static void RemoteControlSet()
     static uint8_t bullet_speed_index = 1;  // 默认18m/s (index=1)
     static int16_t last_dial = 0;           // 上一次拨轮值
     
-    int16_t curr_dial = rc_data[TEMP].rc.dial;  // 拨轮值, 范围 -660 ~ +660
+    // int16_t curr_dial = rc_data[TEMP].rc.dial;  // 拨轮值, 范围 -660 ~ +660
     
 shoot_cmd_send.lid_mode = LID_OPEN;
 
@@ -327,7 +379,7 @@ shoot_cmd_send.lid_mode = LID_OPEN;
         shoot_cmd_send.friction_mode = FRICTION_ON;
         shoot_cmd_send.shoot_mode = SHOOT_ON;
         shoot_cmd_send.load_mode = LOAD_BURSTFIRE;
-        shoot_cmd_send.shoot_rate = shoot_frequency;
+        
     } 
     else if (curr_dial < -100) { 
         // 【拨轮向上微推】：仅开启摩擦轮预热

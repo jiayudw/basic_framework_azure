@@ -113,7 +113,7 @@ void get_protocol_send_data(
     // tx_buf[35] = 0; // [34]
     // tx_buf[36] = 0; // [35]
     // 4. 帧尾/校验
-    tx_buf[25] = 0; // CRC 占位，暂时填 
+    tx_buf[25] = tx_data->enemy_color; // CRC 占位，暂时填 
     tx_buf[26] = 0; // CRC 占位，暂时填 0 或者固定值，防止数组越界
     tx_buf[27] = 0; // CRC 占位，暂时填 0 或者固定值，防止数组越界
     tx_buf[28] = 0; // CRC 占位，暂时填 0 或者固定值，防止数组越界

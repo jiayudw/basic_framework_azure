@@ -239,6 +239,7 @@ void GimbalTask()
     vision_send_data.pitch = gimbal_feedback_data.gimbal_imu_data.Pitch;
     vision_send_data.yaw = gimbal_feedback_data.gimbal_imu_data.Yaw;   
     vision_send_data.roll = gimbal_feedback_data.gimbal_imu_data.Roll;
+    vision_send_data.enemy_color = chassis_refe_data.enemy_color;
     // vision_send_data.chassis_angle = 0.0f;
 
     // vision_send_data.vx = chassis_refe_data.speed_vx;

@@ -13,10 +13,16 @@ static DJIMotorInstance *friction_l, *friction_r, *loader; // 拨盘电机
 static Publisher_t *shoot_pub;
 static Shoot_Ctrl_Cmd_s shoot_cmd_recv; // 来自cmd的发射控制信息
 static Subscriber_t *shoot_sub;
+static Subscriber_t *shoot_heat_sub;
+// static referee_info_t* referee_data; // 用于获取裁判系统的数据,给热量上限制
+
+static Chassis_Upload_Data_s shoot_heat_data; //取址存储在shoot_heat_data里面
 static Shoot_Upload_Data_s shoot_feedback_data; // 来自cmd的发射控制信息
 
 // dwt定时,计算冷却用
-static float hibernate_time = 0, dead_time = 0;
+static float hibernate_time = 0, dead_time = 0,last_time = 0;
+static uint8_t choose_mode = LOAD_REVERSE;
+
 
 void ShootInit()
 {
@@ -103,6 +109,7 @@ void ShootInit()
 
     shoot_pub = PubRegister("shoot_feed", sizeof(Shoot_Upload_Data_s));
     shoot_sub = SubRegister("shoot_cmd", sizeof(Shoot_Ctrl_Cmd_s));
+    shoot_heat_sub = SubRegister("chassis_feed",sizeof(Chassis_Upload_Data_s));
 }
 
 /* 机器人发射机构控制核心任务 */
@@ -112,8 +119,8 @@ void ShootTask()
     static float snapshot_angle = 0;
     static float target_angle = 0;
     // 从cmd获取控制数据
-    SubGetMessage(shoot_sub, &shoot_cmd_recv);
-    
+    SubGetMessage(shoot_sub, &shoot_cmd_recv);    
+    SubGetMessage(shoot_heat_sub, &shoot_heat_data);
 
     // 对shoot mode等于SHOOT_STOP的情况特殊处理,直接停止所有电机(紧急停止)
     if (shoot_cmd_recv.shoot_mode == SHOOT_OFF)
@@ -141,9 +148,8 @@ void ShootTask()
     float current_time = DWT_GetTimeline_ms();
     uint8_t is_cooling_down = (current_time < hibernate_time + dead_time);
 
-
     // 若不在休眠状态,根据robotCMD传来的控制模式进行拨盘电机参考值设定和模式切换
-    switch (shoot_cmd_recv.load_mode)
+    switch (choose_mode)
     {
     // 停止拨盘
     case LOAD_STOP:
@@ -212,7 +218,7 @@ void ShootTask()
         
         // 检查：确保 shoot_rate 不为 0
         // 如果 robot_cmd 没发具体的 shoot_rate，这里最好给个默认保底值
-        float current_shoot_rate = shoot_cmd_recv.shoot_rate;
+        float current_shoot_rate = 0;
         if (current_shoot_rate == 0) {current_shoot_rate = 8;} // 默认8发/秒
         
         DJIMotorSetRef(loader, -current_shoot_rate * (360.0f/6.0f) * REDUCTION_RATIO_LOADER );
@@ -258,7 +264,7 @@ void ShootTask()
         // while (1)
         //     ; // 未知模式,停止运行,检查指针越界,内存溢出等问题
     }
-     last_load_mode = shoot_cmd_recv.load_mode;
+    last_load_mode = shoot_cmd_recv.load_mode;
 
     // 确定是否开启摩擦轮,后续可能修改为键鼠模式下始终开启摩擦轮(上场时建议一直开启)
     if (shoot_cmd_recv.friction_mode == FRICTION_ON)
@@ -299,7 +305,35 @@ void ShootTask()
     {
         //...
     }
-
+    LimitShootPower();
     // 反馈数据,目前暂时没有要设定的反馈数据,后续可能增加应用离线监测以及卡弹反馈
     PubPushMessage(shoot_pub, (void *)&shoot_feedback_data);
+}
+void LimitShootPower(){
+    // 1.获取热量相关：Buff,当前射击热量，当前射击限制
+    float buffer_energy = shoot_heat_data.buffer_energy;//未知buff增益
+    float shoot_heat = shoot_heat_data.shoot_heat;      //小弹丸热量
+    const float shoot_heat_limit = 300.0f; //热量限制
+    // //2.备用限制常数
+    const float SCALE_SAFE       = 1.0f;   // 100% 输出
+    const float SCALE_WARN       = 0.6f;   // 60%  输出
+    const float SCALE_DANGER     = 0.4f;   // 40%  输出
+    const float SCALE_EXTREME    = 0.2f;   // 20%  输出
+    if (shoot_heat_limit*0.9 < shoot_heat){
+        choose_mode = LOAD_REVERSE;
+    }
+    else if(shoot_heat_limit*0.2 > shoot_heat ){
+        if(shoot_cmd_recv.shoot_mode == SHOOT_ON && last_time < 5){
+            choose_mode = LOAD_BURSTFIRE;
+            shoot_cmd_recv.friction_mode = FRICTION_ON;
+            shoot_cmd_recv.shoot_mode = SHOOT_ON;
+            shoot_cmd_recv.bullet_speed = SMALL_AMU_15;
+            last_time += 0.005;
+        }
+        else{
+            choose_mode = LOAD_REVERSE;
+            last_time = 0;
+        }
+    }
+
 }

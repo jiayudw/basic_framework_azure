@@ -110,6 +110,7 @@ typedef struct
 	float chassis_angle;
 	float x;
 	float y;
+	uint8_t enemy_color; // 颜色
 	// uint8_t retreat_cmd;
 	// uint8_t avoid_cmd;
 	// uint8_t game_state;
