@@ -172,80 +172,80 @@ static void MecanumCalculate()
  */
 static void LimitChassisOutput()
 {
-        // =========================================================
-    // 1. 参数调优区 (常量定义，便于赛场快速修改)
-    // =========================================================
-    const float MAX_WHEEL_SPEED = 19900.0f; // M3508电机的最大安全设定转速(根据实际PID整定修改)
+    //     // =========================================================
+    // // 1. 参数调优区 (常量定义，便于赛场快速修改)
+    // // =========================================================
+    // const float MAX_WHEEL_SPEED = 29000.0f; // M3508电机的最大安全设定转速(根据实际PID整定修改)
     
-    // 缓冲能量阈值
-    const float BUF_WARN_THRES   = 60.0f;  // 开始轻微限制的阈值
-    const float BUF_DANGER_THRES = 30.0f;  // 开始中等限制的阈值
-    const float BUF_EXTREME_THRES= 10.0f;  // 极度危险限制的阈值
+    // // 缓冲能量阈值
+    // const float BUF_WARN_THRES   = 60.0f;  // 开始轻微限制的阈值
+    // const float BUF_DANGER_THRES = 30.0f;  // 开始中等限制的阈值
+    // const float BUF_EXTREME_THRES= 10.0f;  // 极度危险限制的阈值
     
-    // 对应的功率缩放系数
-    const float SCALE_SAFE       = 1.0f;   // 100% 输出
-    const float SCALE_WARN       = 0.6f;   // 60%  输出
-    const float SCALE_DANGER     = 0.4f;   // 40%  输出
-    const float SCALE_EXTREME    = 0.2f;   // 20%  输出
+    // // 对应的功率缩放系数
+    // const float SCALE_SAFE       = 1.0f;   // 100% 输出
+    // const float SCALE_WARN       = 0.6f;   // 60%  输出
+    // const float SCALE_DANGER     = 0.4f;   // 40%  输出
+    // const float SCALE_EXTREME    = 0.2f;   // 20%  输出
 
-    // =========================================================
-    // 2. 状态获取与裁判系统离线保护
-    // =========================================================
-    float power_scale    = SCALE_SAFE; 
-    float current_buffer = chassis_feedback_data.buffer_energy;
-    float power_limit    = chassis_feedback_data.chassis_power_limit; 
+    // // =========================================================
+    // // 2. 状态获取与裁判系统离线保护
+    // // =========================================================
+    // float power_scale    = SCALE_SAFE; 
+    // float current_buffer = chassis_feedback_data.buffer_energy;
+    // float power_limit    = chassis_feedback_data.chassis_power_limit; 
 
-    // 判断如果power_limit大于0（表明插了裁判系统且正在通讯）才限制功率
-    if (power_limit > 0.0f) 
-    {
-        if (current_buffer < BUF_EXTREME_THRES) 
-        {
-            power_scale = SCALE_EXTREME;
-        } 
-        else if (current_buffer < BUF_DANGER_THRES) 
-        {
-            power_scale = SCALE_DANGER;
-        } 
-        else if (current_buffer < BUF_WARN_THRES) 
-        {
-            power_scale = SCALE_WARN;
-        } 
-        else 
-        {
-            power_scale = SCALE_SAFE;
-        }
-    }
+    // // 判断如果power_limit大于0（表明插了裁判系统且正在通讯）才限制功率
+    // if (power_limit > 0.0f) 
+    // {
+    //     if (current_buffer < BUF_EXTREME_THRES) 
+    //     {
+    //         power_scale = SCALE_EXTREME;
+    //     } 
+    //     else if (current_buffer < BUF_DANGER_THRES) 
+    //     {
+    //         power_scale = SCALE_DANGER;
+    //     } 
+    //     else if (current_buffer < BUF_WARN_THRES) 
+    //     {
+    //         power_scale = SCALE_WARN;
+    //     } 
+    //     else 
+    //     {
+    //         power_scale = SCALE_SAFE;
+    //     }
+    // }
 
-    // =========================================================
-    // 3. 施加功率衰减 (等比例缩放，保证麦轮受力方向不变)
-    // =========================================================
-    vt_lf *= power_scale;
-    vt_rf *= power_scale;
-    vt_lb *= power_scale;
-    vt_rb *= power_scale;
+    // // =========================================================
+    // // 3. 施加功率衰减 (等比例缩放，保证麦轮受力方向不变)
+    // // =========================================================
+    // vt_lf *= power_scale;
+    // vt_rf *= power_scale;
+    // vt_lb *= power_scale;
+    // vt_rb *= power_scale;
 
-    // =========================================================
-    // 4. 运动学最大转速限幅防爆冲
-    // =========================================================
-    // 找出四个轮子解算速度的绝对值最大者
-    float max_speed = fabsf(vt_lf);
-    if (fabsf(vt_rf) > max_speed) { max_speed = fabsf(vt_rf); }
-    if (fabsf(vt_lb) > max_speed) { max_speed = fabsf(vt_lb); }
-    if (fabsf(vt_rb) > max_speed) { max_speed = fabsf(vt_rb); }
+    // // =========================================================
+    // // 4. 运动学最大转速限幅防爆冲
+    // // =========================================================
+    // // 找出四个轮子解算速度的绝对值最大者
+    // float max_speed = fabsf(vt_lf);
+    // if (fabsf(vt_rf) > max_speed) { max_speed = fabsf(vt_rf); }
+    // if (fabsf(vt_lb) > max_speed) { max_speed = fabsf(vt_lb); }
+    // if (fabsf(vt_rb) > max_speed) { max_speed = fabsf(vt_rb); }
 
-    // 如果最大值超出了底盘物理极限，则进行二次等比例压缩
-    if (max_speed > MAX_WHEEL_SPEED)
-    {
-        float rate = MAX_WHEEL_SPEED / max_speed;
-        vt_lf *= rate;
-        vt_rf *= rate;
-        vt_lb *= rate;
-        vt_rb *= rate;
-    }
+    // // 如果最大值超出了底盘物理极限，则进行二次等比例压缩
+    // if (max_speed > MAX_WHEEL_SPEED)
+    // {
+    //     float rate = MAX_WHEEL_SPEED / max_speed;
+    //     vt_lf *= rate;
+    //     vt_rf *= rate;
+    //     vt_lb *= rate;
+    //     vt_rb *= rate;
+    // }
 
-    // =========================================================
-    // 5. 设置底层电机参考值
-    // =========================================================
+    // // =========================================================
+    // // 5. 设置底层电机参考值
+    // // =========================================================
 
     // 完成功率限制后进行电机参考输入设定
     DJIMotorSetRef(motor_lf, vt_lf);
@@ -304,24 +304,24 @@ void ChassisTask()
         float wz_target = 1.5f * chassis_cmd_recv.offset_angle 
                     * abs(chassis_cmd_recv.offset_angle);
     
-        // 斜坡限制：每帧最多变化 50（根据任务频率调整）
-        const float WZ_RAMP = 30.0f;
-        static float wz_filtered = 0.0f;
+        // // 斜坡限制：每帧最多变化 50（根据任务频率调整）
+        // const float WZ_RAMP = 30.0f;
+        // static float wz_filtered = 0.0f;
         
-        if (wz_target - wz_filtered > WZ_RAMP)
-            wz_filtered += WZ_RAMP;
-        else if (wz_target - wz_filtered < -WZ_RAMP)
-            wz_filtered -= WZ_RAMP;
-        else
-            wz_filtered = wz_target;
+        // if (wz_target - wz_filtered > WZ_RAMP)
+        //     wz_filtered += WZ_RAMP;
+        // else if (wz_target - wz_filtered < -WZ_RAMP)
+        //     wz_filtered -= WZ_RAMP;
+        // else
+        //     wz_filtered = wz_target;
         
-        chassis_cmd_recv.wz = wz_filtered;
+        chassis_cmd_recv.wz = wz_target;
         break;
     case CHASSIS_ROTATE: // 自旋,同时保持全向机动;当前wz维持定值,后续增加不规则的变速策略
-        chassis_cmd_recv.wz = 2000;
+        chassis_cmd_recv.wz = 3000;
         if ((chassis_cmd_recv.vx == 0) && (chassis_cmd_recv.vy == 0))
         {
-            chassis_cmd_recv.wz = 2000;
+            chassis_cmd_recv.wz = 3000;
         }
         break;
     default:
