@@ -443,11 +443,11 @@ static void MouseKeySet()
     float vy_set = 0.0f;
     
     // 设置底盘基础移动速度
-    float chassis_base_speed = 14000.0f; 
+    float chassis_base_speed = 19000.0f; 
 
     // 如果按下 Shift 键，实现加速（冲刺模式）
     if (vtm_data->key.shift == 1) {
-        chassis_base_speed = 18000.0f; // 冲刺速度
+        chassis_base_speed = 22500.0f; // 冲刺速度
     }
 
     // 前后平移控制 (W / S)
