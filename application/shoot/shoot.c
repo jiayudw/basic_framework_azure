@@ -82,7 +82,7 @@ void ShootInit()
                 .MaxOut = 15000,
             },
             .current_PID = {
-                .Kp = 0.7, // 0.7
+                .Kp = 1, // 0.7
                 .Ki = 0.08, // 0.1
                 .Kd = 0,
                 .Improve = PID_Integral_Limit,
@@ -190,7 +190,7 @@ void ShootTask()
             dead_time      = 150.0f;   // 按机械情况再调
             reverse_trigger = 0;
         }
-        float smooth_factor = 0.08f; 
+        float smooth_factor = 0.2f; 
         smoothed_angle += (target_angle - smoothed_angle) * smooth_factor;
 
         // 此时喂给底层的不再是断崖式的突变，而是一条圆滑的指数衰减曲线
