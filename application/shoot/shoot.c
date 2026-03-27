@@ -95,7 +95,7 @@ void ShootInit()
             .angle_feedback_source = MOTOR_FEED, .speed_feedback_source = MOTOR_FEED,
             .outer_loop_type = SPEED_LOOP, // 初始化成SPEED_LOOP,让拨盘停在原地,防止拨盘上电时乱转
             .close_loop_type = ANGLE_LOOP | SPEED_LOOP | CURRENT_LOOP, 
-            .motor_reverse_flag = MOTOR_DIRECTION_REVERSE, // 注意方向设置为拨盘的拨出的击发方向
+            .motor_reverse_flag = MOTOR_DIRECTION_NORMAL, // 注意方向设置为拨盘的拨出的击发方向
         },
         .motor_type = M2006 // 英雄使用m3508
     };
@@ -166,6 +166,7 @@ void ShootTask()
     case LOAD_1_BULLET:
     {
         DJIMotorOuterLoop(loader, ANGLE_LOOP);
+        static float smoothed_angle = 0; 
 
         // 冷却中：保持上一次目标角度，不再新增
         if (is_cooling_down)
@@ -182,17 +183,19 @@ void ShootTask()
             // 注意正负方向，和你实际出弹方向保持一致
             target_angle = snapshot_angle + ONE_BULLET_DELTA_ANGLE;
 
-            DJIMotorSetRef(loader, target_angle);
+            //DJIMotorSetRef(loader, target_angle);
+            smoothed_angle = snapshot_angle;
 
             hibernate_time = current_time;
             dead_time      = 150.0f;   // 按机械情况再调
             reverse_trigger = 0;
         }
-        else
-        {
-            // 按住不松的过程中，只维持目标
-            DJIMotorSetRef(loader, target_angle);
-        }
+        float smooth_factor = 0.05f; 
+        smoothed_angle += (target_angle - smoothed_angle) * smooth_factor;
+
+        // 此时喂给底层的不再是断崖式的突变，而是一条圆滑的指数衰减曲线
+        DJIMotorSetRef(loader, smoothed_angle);
+        
     }
     break;
 
@@ -215,7 +218,7 @@ void ShootTask()
         float current_shoot_rate = shoot_cmd_recv.shoot_rate;
         if (current_shoot_rate == 0) {current_shoot_rate = 8;} // 默认8发/秒
         
-        DJIMotorSetRef(loader, -current_shoot_rate * (360.0f/6.0f) * REDUCTION_RATIO_LOADER );
+        DJIMotorSetRef(loader, current_shoot_rate * (360.0f/6.0f) * REDUCTION_RATIO_LOADER );
         reverse_trigger = 0; 
        }   break;
     // 拨盘反转,对速度闭环,后续增加卡弹检测(通过裁判系统剩余热量反馈和电机电流)
@@ -246,7 +249,7 @@ void ShootTask()
     //     break;
     case LOAD_REVERSE:{
     DJIMotorOuterLoop(loader, SPEED_LOOP);
-    DJIMotorSetRef(loader, 1500);  // 负速度反转
+    DJIMotorSetRef(loader, -1500);  // 负速度反转
     break;}
 
     default:

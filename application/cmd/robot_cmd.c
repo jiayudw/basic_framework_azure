@@ -113,7 +113,7 @@ void RobotCMDInit()
 // #if YAW_ECD_GREATER_THAN_4096                               // 如果大于180度
 //     if (angle > YAW_ALIGN_ANGLE)
 //         chassis_cmd_send.offset_angle = angle - YAW_ALIGN_ANGLE;
-//     else if (angle <= YAW_ALIGN_ANGLE && angle >= YAW_ALIGN_ANGLE - 180.0f)
+//     else if (angleMOTOR_DIRECTION_NORMAL <= YAW_ALIGN_ANGLE && angle >= YAW_ALIGN_ANGLE - 180.0f)
 //         chassis_cmd_send.offset_angle = angle - YAW_ALIGN_ANGLE;
 //     else
 //         chassis_cmd_send.offset_angle = angle - YAW_ALIGN_ANGLE + 360.0f;
@@ -295,7 +295,7 @@ shoot_cmd_send.lid_mode = LID_OPEN;
         // shoot_cmd_send.load_mode = LOAD_REVERSE;
         shoot_cmd_send.friction_mode = FRICTION_ON;
         shoot_cmd_send.shoot_mode = SHOOT_ON;
-        shoot_cmd_send.load_mode = LOAD_1_BULLET;
+        shoot_cmd_send.load_mode = LOAD_REVERSE;
     }
     else if (curr_dial > 100) {
         // 【拨轮向下微推】：单发模式
@@ -377,25 +377,31 @@ static void MouseKeySet()
             gimbal_cmd_send.pitch = PITCH_MIN_ANGLE;
     }
 
-
-   // ================= 3. 发射机构控制 (鼠标左键控制) =================
+    // ================= 3. 发射机构控制 (鼠标左键控制) =================
     shoot_cmd_send.lid_mode = LID_OPEN; // 默认打开弹舱盖
 
-    // 定义一个静态变量，用来记录按住左键的时间（调用次数）
+    // 定义静态变量，用来记录按住左键的时间（调用次数）
     static uint16_t left_mouse_press_time = 0;
     
-    // 设定阈值：由于 CMD 任务假设是 200Hz（5ms执行一次）
-    // 比如：设定按住超过 300 毫秒 (300 / 5 = 60次) 就算长按连发
-    const uint16_t LONG_PRESS_THRESHOLD = 60; 
+    // 新增：定义单发指令的保持计时器，确保底层电机有足够的时间走完全程
+    static uint16_t single_shoot_hold_timer = 0; 
+    
+    // 设定阈值：假设 CMD 任务是 200Hz（5ms执行一次）
+    const uint16_t LONG_PRESS_THRESHOLD = 60; // 300ms 算长按
+    
+    // 猜想：假设拨弹一次需要 150ms 左右，150 / 5 = 30 个周期。
+    // 注意：这个值你可能需要根据你实际底层的 PID 响应速度进行调整！
+    const uint16_t SINGLE_SHOOT_HOLD_TIME = 30; 
+
     // ===【Q键反转逻辑：优先级最高，按下Q直接反转清弹】===
     if (vtm_data->key.q == 1)
     {
-        // Q键按住期间，强制覆盖所有射击状态为反转
-        left_mouse_press_time = 0; // 同时清零左键计时器，防止松开Q后立刻误触发连发
+        left_mouse_press_time = 0; 
+        single_shoot_hold_timer = 0; // 反转时打断可能正在进行的单发保持
         shoot_cmd_send.friction_mode = FRICTION_ON;
         shoot_cmd_send.shoot_mode    = SHOOT_ON;
         shoot_cmd_send.load_mode     = LOAD_REVERSE;
-        shoot_cmd_send.shoot_rate    = 4; // 反转速度，可调
+        shoot_cmd_send.shoot_rate    = 4; 
         shoot_cmd_send.bullet_speed  = SMALL_AMU_15;
     }
     // ===【F键摩擦轮已开启，才允许正向射击逻辑】===
@@ -409,10 +415,13 @@ static void MouseKeySet()
 
             if (left_mouse_press_time < LONG_PRESS_THRESHOLD)
             {
-                // 【短按】单发
+                // 【短按】触发单发
                 shoot_cmd_send.shoot_mode = SHOOT_ON;
                 shoot_cmd_send.load_mode  = LOAD_1_BULLET;
                 shoot_cmd_send.bullet_speed = SMALL_AMU_15;
+                
+                // 只要左键按住且处于单发判定区间，就刷新保持时间
+                single_shoot_hold_timer = SINGLE_SHOOT_HOLD_TIME; 
             }
             else
             {
@@ -421,20 +430,35 @@ static void MouseKeySet()
                 shoot_cmd_send.load_mode  = LOAD_BURSTFIRE;
                 shoot_cmd_send.shoot_rate = shoot_frequency;
                 shoot_cmd_send.bullet_speed = SMALL_AMU_15;
+                single_shoot_hold_timer = 0; // 连发不需要后续保持
             }
         }
         else
         {
-            // 松开左键，清零并停止
+            // 松开左键，清零按压时间
             left_mouse_press_time = 0;
-            shoot_cmd_send.shoot_mode = SHOOT_OFF;
-            shoot_cmd_send.load_mode  = LOAD_STOP;
+
+            // 严谨判断：单发机械动作是否可能还没执行完？
+            if (single_shoot_hold_timer > 0)
+            {
+                single_shoot_hold_timer--;
+                // 在保持时间内，强行继续下发单发指令
+                shoot_cmd_send.shoot_mode = SHOOT_ON;
+                shoot_cmd_send.load_mode  = LOAD_1_BULLET;
+            }
+            else
+            {
+                // 保持时间结束，确认安全，真正下发停止指令
+                shoot_cmd_send.shoot_mode = SHOOT_OFF;
+                shoot_cmd_send.load_mode  = LOAD_STOP;
+            }
         }
     }
     else
     {
         // 摩擦轮没开，强制停止
         left_mouse_press_time = 0;
+        single_shoot_hold_timer = 0;
         shoot_cmd_send.shoot_mode = SHOOT_OFF;
         shoot_cmd_send.load_mode  = LOAD_STOP;
     }
