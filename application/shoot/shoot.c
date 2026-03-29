@@ -249,7 +249,7 @@ void ShootTask()
     //     break;
     case LOAD_REVERSE:{
     DJIMotorOuterLoop(loader, SPEED_LOOP);
-    DJIMotorSetRef(loader, 1500);  // 负速度反转
+    DJIMotorSetRef(loader, 1+500);  // 负速度反转
     break;}
 
     default:
@@ -270,8 +270,8 @@ void ShootTask()
         switch (shoot_cmd_recv.bullet_speed)
         {
         case SMALL_AMU_15:
-            DJIMotorSetRef(friction_l, -29000);
-            DJIMotorSetRef(friction_r, 29000);
+            DJIMotorSetRef(friction_l, -28000);
+            DJIMotorSetRef(friction_r, 28000);
             break;
         case SMALL_AMU_18:
             DJIMotorSetRef(friction_l, 36000);

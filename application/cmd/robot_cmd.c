@@ -360,7 +360,14 @@ static void MouseKeySet()
         if (vision_recv_data->ACTION_DATA.distance != -1) 
         {
             // 如果视觉识别到目标，直接给定视觉计算的绝对角度或偏移量
-            gimbal_cmd_send.yaw = vision_recv_data->ACTION_DATA.yaw;
+             float d= vision_recv_data->ACTION_DATA.yaw - gimbal_cmd_send.yaw;
+            int d_n=(int)(d/360.0);
+            float angle_proc = vision_recv_data->ACTION_DATA.yaw - d_n*360; //abs<360
+            if (angle_proc-gimbal_cmd_send.yaw>180)
+                angle_proc-=360;
+            else if(angle_proc-gimbal_cmd_send.yaw<-180)
+                angle_proc+=360;
+            gimbal_cmd_send.yaw=angle_proc;
             gimbal_cmd_send.pitch = vision_recv_data->ACTION_DATA.pitch;
         }
     }
