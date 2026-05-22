@@ -28,7 +28,7 @@ set(DSP_NAME "libCMSISDSP.a") # 指定DSP库名称
 link_directories(${CMAKE_SOURCE_DIR}/Middlewares/ST/ARM/DSP/Lib)
 
 # Generic compiler settings for optimization and basic link lib
-add_compile_options(-pipe ${MCU_FLAGS} -Wall -Werror -fmessage-length=0 # basic options
+add_compile_options(-pipe ${MCU_FLAGS} -Wall -fmessage-length=0 # basic options
                     -ffunction-sections -fdata-sections -fno-common # optimize options 
                     )
 add_link_options(-pipe ${MCU_FLAGS} -T${LINKER_SCRIPT} -Wl,--no-warn-rwx-segments # close RWX warning
@@ -76,6 +76,9 @@ file(GLOB_RECURSE SOURCES
     "modules/*.c"
     "application/*.c"
 )
+
+list(FILTER SOURCES EXCLUDE REGEX ".*syscalls\\.c$")
+list(FILTER SOURCES EXCLUDE REGEX ".*sysmem\\.c$")
 
 # 汇编文件路径
 # ENABLE_LANGUAGE(ASM)

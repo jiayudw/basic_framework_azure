@@ -6,7 +6,9 @@
 #include "daemon.h"
 #include "bsp_log.h"
 
-#define REMOTE_CONTROL_FRAME_SIZE 18u // 遥控器接收的buffer大小
+#define REMOTE_CONTROL_FRAME_SIZE 25u // 遥控器接收的buffer大小
+
+uint16_t CH[16];
 
 // 遥控器数据
 static RC_ctrl_t rc_ctrl[2];     //[0]:当前数据TEMP,[1]:上一次的数据LAST.用于按键持续按下和切换的判断
@@ -34,56 +36,70 @@ static void RectifyRCjoystick()
  */
 static void sbus_to_rc(const uint8_t *sbus_buf)
 {
-    // 摇杆,直接解算时减去偏置
-    rc_ctrl[TEMP].rc.rocker_r_ = ((sbus_buf[0] | (sbus_buf[1] << 8)) & 0x07ff) - RC_CH_VALUE_OFFSET;                              //!< Channel 0
-    rc_ctrl[TEMP].rc.rocker_r1 = (((sbus_buf[1] >> 3) | (sbus_buf[2] << 5)) & 0x07ff) - RC_CH_VALUE_OFFSET;                       //!< Channel 1
-    rc_ctrl[TEMP].rc.rocker_l_ = (((sbus_buf[2] >> 6) | (sbus_buf[3] << 2) | (sbus_buf[4] << 10)) & 0x07ff) - RC_CH_VALUE_OFFSET; //!< Channel 2
-    rc_ctrl[TEMP].rc.rocker_l1 = (((sbus_buf[4] >> 1) | (sbus_buf[5] << 7)) & 0x07ff) - RC_CH_VALUE_OFFSET;                       //!< Channel 3
-    rc_ctrl[TEMP].rc.dial = ((sbus_buf[16] | (sbus_buf[17] << 8)) & 0x07FF) - RC_CH_VALUE_OFFSET;                                 // 左侧拨轮
-    RectifyRCjoystick();
-    // 开关,0左1右
-    rc_ctrl[TEMP].rc.switch_right = ((sbus_buf[5] >> 4) & 0x0003);     //!< Switch right
-    rc_ctrl[TEMP].rc.switch_left = ((sbus_buf[5] >> 4) & 0x000C) >> 2; //!< Switch left
+    uint16_t ch_val;
+    // 通道 0
+    ch_val = (sbus_buf[1] >> 0 | sbus_buf[2] << 8) & 0x07FF;
+    CH[0] = ch_val;
 
-    // 鼠标解析
-    rc_ctrl[TEMP].mouse.x = (sbus_buf[6] | (sbus_buf[7] << 8)); //!< Mouse X axis
-    rc_ctrl[TEMP].mouse.y = (sbus_buf[8] | (sbus_buf[9] << 8)); //!< Mouse Y axis
-    rc_ctrl[TEMP].mouse.press_l = sbus_buf[12];                 //!< Mouse Left Is Press ?
-    rc_ctrl[TEMP].mouse.press_r = sbus_buf[13];                 //!< Mouse Right Is Press ?
+    // 通道 1
+    ch_val = (sbus_buf[2] >> 3 | sbus_buf[3] << 5) & 0x07FF;
+    CH[1] = ch_val;
 
-    //  位域的按键值解算,直接memcpy即可,注意小端低字节在前,即lsb在第一位,msb在最后
-    *(uint16_t *)&rc_ctrl[TEMP].key[KEY_PRESS] = (uint16_t)(sbus_buf[14] | (sbus_buf[15] << 8));
-    if (rc_ctrl[TEMP].key[KEY_PRESS].ctrl) // ctrl键按下
-        rc_ctrl[TEMP].key[KEY_PRESS_WITH_CTRL] = rc_ctrl[TEMP].key[KEY_PRESS];
-    else
-        memset(&rc_ctrl[TEMP].key[KEY_PRESS_WITH_CTRL], 0, sizeof(Key_t));
-    if (rc_ctrl[TEMP].key[KEY_PRESS].shift) // shift键按下
-        rc_ctrl[TEMP].key[KEY_PRESS_WITH_SHIFT] = rc_ctrl[TEMP].key[KEY_PRESS];
-    else
-        memset(&rc_ctrl[TEMP].key[KEY_PRESS_WITH_SHIFT], 0, sizeof(Key_t));
+    // 通道 2
+    ch_val = (sbus_buf[3] >> 6 | sbus_buf[4] << 2 | sbus_buf[5] << 10) & 0x07FF;
+    CH[2] = ch_val;
 
-    uint16_t key_now = rc_ctrl[TEMP].key[KEY_PRESS].keys,                   // 当前按键是否按下
-        key_last = rc_ctrl[LAST].key[KEY_PRESS].keys,                       // 上一次按键是否按下
-        key_with_ctrl = rc_ctrl[TEMP].key[KEY_PRESS_WITH_CTRL].keys,        // 当前ctrl组合键是否按下
-        key_with_shift = rc_ctrl[TEMP].key[KEY_PRESS_WITH_SHIFT].keys,      //  当前shift组合键是否按下
-        key_last_with_ctrl = rc_ctrl[LAST].key[KEY_PRESS_WITH_CTRL].keys,   // 上一次ctrl组合键是否按下
-        key_last_with_shift = rc_ctrl[LAST].key[KEY_PRESS_WITH_SHIFT].keys; // 上一次shift组合键是否按下
-    for (uint16_t i = 0, j = 0x1; i < 16; j <<= 1, i++)
-    {
-        if (i == 4  || i == 5) // 4,5位为ctrl和shift,直接跳过
-            continue;
-        // 如果当前按键按下,上一次按键没有按下,且ctrl和shift组合键没有按下,则按键按下计数加1(检测到上升沿)
-        if ((key_now & j) && !(key_last & j) && !(key_with_ctrl & j) && !(key_with_shift & j))
-            rc_ctrl[TEMP].key_count[KEY_PRESS][i]++;
-        // 当前ctrl组合键按下,上一次ctrl组合键没有按下,则ctrl组合键按下计数加1(检测到上升沿)
-        if ((key_with_ctrl & j) && !(key_last_with_ctrl & j))
-            rc_ctrl[TEMP].key_count[KEY_PRESS_WITH_CTRL][i]++;
-        // 当前shift组合键按下,上一次shift组合键没有按下,则shift组合键按下计数加1(检测到上升沿)
-        if ((key_with_shift & j) && !(key_last_with_shift & j))
-            rc_ctrl[TEMP].key_count[KEY_PRESS_WITH_SHIFT][i]++;
-    }
-    rc_ctrl[TEMP].lost_flag = 0; // 收到数据,清除掉线标志
-    memcpy(&rc_ctrl[LAST], &rc_ctrl[TEMP], sizeof(RC_ctrl_t)); // 保存上一次的数据,用于按键持续按下和切换的判断
+    // 通道 3
+    ch_val = (sbus_buf[5] >> 1 | sbus_buf[6] << 7) & 0x07FF;
+    CH[3] = ch_val;
+
+    // 通道 4
+    ch_val = (sbus_buf[6] >> 4 | sbus_buf[7] << 4) & 0x07FF;
+    CH[4] = ch_val;
+
+    // 通道 5
+    ch_val = (sbus_buf[7] >> 7 | sbus_buf[8] << 1 | sbus_buf[9] << 9) & 0x07FF;
+    CH[5] = ch_val;
+
+    // 通道 6
+    ch_val = (sbus_buf[9] >> 2 | sbus_buf[10] << 6) & 0x07FF;
+    CH[6] = ch_val;
+
+    // 通道 7
+    ch_val = (sbus_buf[10] >> 5 | sbus_buf[11] << 3) & 0x07FF;
+    CH[7] = ch_val;
+
+    // 通道 8
+    ch_val = (sbus_buf[12] >> 0 | sbus_buf[13] << 8) & 0x07FF;
+    CH[8] = ch_val;
+
+    // 通道 9
+    ch_val = (sbus_buf[13] >> 3 | sbus_buf[14] << 5) & 0x07FF;
+    CH[9] = ch_val;
+
+    // 通道 10
+    ch_val = (sbus_buf[14] >> 6 | sbus_buf[15] << 2 | sbus_buf[16] << 10) & 0x07FF;
+    CH[10] = ch_val;
+
+    // 通道 11
+    ch_val = (sbus_buf[16] >> 1 | sbus_buf[17] << 7) & 0x07FF;
+    CH[11] = ch_val;
+
+    // 通道 12
+    ch_val = (sbus_buf[17] >> 4 | sbus_buf[18] << 4) & 0x07FF;
+    CH[12] = ch_val;
+
+    // 通道 13
+    ch_val = (sbus_buf[18] >> 7 | sbus_buf[19] << 1 | sbus_buf[20] << 9) & 0x07FF;
+    CH[13] = ch_val;
+
+    // 通道 14
+    ch_val = (sbus_buf[20] >> 2 | sbus_buf[21] << 6) & 0x07FF;
+    CH[14] = ch_val;
+
+    // 通道 15
+    ch_val = (sbus_buf[21] >> 5 | sbus_buf[22] << 3) & 0x07FF;
+    CH[15] = ch_val;
 }
 
 /**
