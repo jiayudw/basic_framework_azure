@@ -99,6 +99,9 @@ typedef struct
 
         uint8_t switch_left;  // 左侧开关
         uint8_t switch_right; // 右侧开关
+
+        uint8_t switch_middle_left;  // 中间偏左开关
+        uint8_t switch_middle_right; // 中间偏右开关
     } rc;
     struct
     {
