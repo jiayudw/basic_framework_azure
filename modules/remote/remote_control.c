@@ -8,7 +8,6 @@
 #include <stdint.h>
 
 #define REMOTE_CONTROL_FRAME_SIZE 25u // 遥控器接收的buffer大小
-
 // 遥控器数据
 static RC_ctrl_t rc_ctrl[2];     //[0]:当前数据TEMP,[1]:上一次的数据LAST.用于按键持续按下和切换的判断
 static uint8_t rc_init_flag = 0; // 遥控器初始化标志位
@@ -16,7 +15,7 @@ static uint8_t rc_init_flag = 0; // 遥控器初始化标志位
 // 遥控器拥有的串口实例,因为遥控器是单例,所以这里只有一个,就不封装了
 static USARTInstance *rc_usart_instance;
 static DaemonInstance *rc_daemon_instance;
-
+uint16_t CH[16];
 /**
  * @brief 矫正遥控器摇杆的值,超过660或者小于-660的值都认为是无效值,置0
  *
@@ -33,8 +32,10 @@ static void RectifyRCjoystick()
  *
  * @param sbus_buf 接收buffer
  */
+
 static void sbus_to_rc(const uint8_t *sbus_buf)
-{
+{   
+    #if defined(NEW_REMOTE)
     // 右水平摇杆 -393 ~ +382
     rc_ctrl[0].rc.rocker_r_ = ((sbus_buf[1] >> 0 | sbus_buf[2] << 8) & 0x07FF) - 1033;
 
@@ -49,7 +50,6 @@ static void sbus_to_rc(const uint8_t *sbus_buf)
 
     // VRA -784 ~ +783 顺时针增加
     rc_ctrl[0].rc.dial = ((sbus_buf[6] >> 4 | sbus_buf[7] << 4) & 0x07FF) - 1024;
-
     uint16_t switch_ch;
 
     // SWA 下:0 上:1
@@ -70,6 +70,67 @@ static void sbus_to_rc(const uint8_t *sbus_buf)
 
     rc_ctrl[TEMP].lost_flag = 0; // 收到数据,清除掉线标志
     memcpy(&rc_ctrl[LAST], &rc_ctrl[TEMP], sizeof(RC_ctrl_t)); // 保存上一次的数据.待用
+    #endif
+    #if defined(DJI_REMOTE)
+    uint16_t ch_val;
+    // 通道 0
+    ch_val = (sbus_buf[1] >> 0 | sbus_buf[2] << 8) & 0x07FF;
+    CH[0] = ch_val;
+    // 通道 1
+    ch_val = (sbus_buf[2] >> 3 | sbus_buf[3] << 5) & 0x07FF;
+    CH[1] = ch_val;
+    // 通道 2
+    ch_val = (sbus_buf[3] >> 6 | sbus_buf[4] << 2 | sbus_buf[5] << 10) & 0x07FF;
+    CH[2] = ch_val;
+
+    // 通道 3
+    ch_val = (sbus_buf[5] >> 1 | sbus_buf[6] << 7) & 0x07FF;
+    CH[3] = ch_val;
+    // 通道 4
+    ch_val = (sbus_buf[7] >> 7 | sbus_buf[8] << 1 | sbus_buf[9] << 9) & 0x07FF;
+    CH[5] = ch_val;
+    ch_val = (sbus_buf[6] >> 4 | sbus_buf[7] << 4) & 0x07FF;
+    CH[4] = ch_val;
+
+    // 通道 5
+    ch_val = (sbus_buf[7] >> 7 | sbus_buf[8] << 1 | sbus_buf[9] << 9) & 0x07FF;
+    CH[5] = ch_val;
+    // 通道 6
+    ch_val = (sbus_buf[9] >> 2 | sbus_buf[10] << 6) & 0x07FF;
+    CH[6] = ch_val;
+    // 通道 7
+    ch_val = (sbus_buf[10] >> 5 | sbus_buf[11] << 3) & 0x07FF;
+    CH[7] = ch_val;
+
+    // 通道 8
+    ch_val = (sbus_buf[12] >> 0 | sbus_buf[13] << 8) & 0x07FF;
+    CH[8] = ch_val;
+    // 通道 9
+    ch_val = (sbus_buf[13] >> 3 | sbus_buf[14] << 5) & 0x07FF;
+    CH[9] = ch_val;
+
+    // 通道 10
+    ch_val = (sbus_buf[14] >> 6 | sbus_buf[15] << 2 | sbus_buf[16] << 10) & 0x07FF;
+    CH[10] = ch_val;
+    // 通道 11
+    ch_val = (sbus_buf[16] >> 1 | sbus_buf[17] << 7) & 0x07FF;
+    CH[11] = ch_val;
+
+    // 通道 12
+    ch_val = (sbus_buf[17] >> 4 | sbus_buf[18] << 4) & 0x07FF;
+    CH[12] = ch_val;
+    // 通道 13
+    ch_val = (sbus_buf[18] >> 7 | sbus_buf[19] << 1 | sbus_buf[20] << 9) & 0x07FF;
+    CH[13] = ch_val;
+
+    // 通道 14
+    ch_val = (sbus_buf[20] >> 2 | sbus_buf[21] << 6) & 0x07FF;
+    CH[14] = ch_val;
+
+    // 通道 15
+    ch_val = (sbus_buf[21] >> 5 | sbus_buf[22] << 3) & 0x07FF;
+    CH[15] = ch_val;
+    #endif
 }
 
 /**

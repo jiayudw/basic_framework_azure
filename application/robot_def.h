@@ -21,6 +21,10 @@
 // #define CHASSIS_BOARD //底盘板
 // #define GIMBAL_BOARD  //云台板
 
+/* 遥控器类型定义,只能存在一个定义! */
+#define NEW_REMOTE // 新遥控器
+// #define DJI_REMOTE //DJI遥控器
+
  #define VISION_USE_VCP  // 使用虚拟串口发送视觉数据
 //#define VISION_USE_UART // 使用串口发送视觉数据
 
@@ -52,6 +56,15 @@
     (defined(ONE_BOARD) && defined(GIMBAL_BOARD)) ||  \
     (defined(CHASSIS_BOARD) && defined(GIMBAL_BOARD))
 #error Conflict board definition! You can only define one board type.
+#endif
+
+// 检查是否出现遥控器定义冲突,只允许一个遥控器存在,否则编译会自动报错
+#if (defined(NEW_REMOTE) && defined(DJI_REMOTE))
+#error Conflict remote_control definition! You can only define one remote type.
+#endif
+
+#if !defined(NEW_REMOTE) && !defined(DJI_REMOTE)
+#error No remote_control type defined! Please define NEW_REMOTE or DJI_REMOTE.
 #endif
 
 #pragma pack(1) // 压缩结构体,取消字节对齐,下面的数据都可能被传输

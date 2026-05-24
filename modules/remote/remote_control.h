@@ -99,9 +99,10 @@ typedef struct
 
         uint8_t switch_left;  // 左侧开关
         uint8_t switch_right; // 右侧开关
-
+        #if defined(NEW_REMOTE)
         uint8_t switch_middle_left;  // 中间偏左开关
         uint8_t switch_middle_right; // 中间偏右开关
+        #endif
     } rc;
     struct
     {
@@ -116,6 +117,7 @@ typedef struct
     uint8_t key_count[3][16];
     uint8_t lost_flag; // 遥控器丢失标志位,用于判断遥控器是否掉线
 } RC_ctrl_t;
+
 
 /* ------------------------- Internal Data ----------------------------------- */
 
