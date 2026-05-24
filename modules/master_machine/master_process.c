@@ -113,11 +113,12 @@ void get_protocol_send_data(
     // tx_buf[35] = 0; // [34]
     // tx_buf[36] = 0; // [35]
     // 4. 帧尾/校验
-    tx_buf[25] = tx_data->enemy_color; // CRC 占位，暂时填 
-    tx_buf[26] = 0; // CRC 占位，暂时填 0 或者固定值，防止数组越界
-    tx_buf[27] = 0; // CRC 占位，暂时填 0 或者固定值，防止数组越界
-    tx_buf[28] = 0; // CRC 占位，暂时填 0 或者固定值，防止数组越界
-    tx_buf[29] = 0; // CRC 占位，暂时填 0 或者固定值，防止数组越界
+    tx_buf[25] = tx_data->enemy_color; // 敌方颜色
+    tx_buf[26] = tx_data->game_state; // 比赛开始 
+    memcpy(&tx_buf[27], &tx_data->robot_HP,   2);
+    // tx_buf[27] = 0; // CRC 占位，暂时填 0 或者固定值，防止数组越界
+    // tx_buf[28] = 0; // CRC 占位，暂时填 0 或者固定值，防止数组越界
+    tx_buf[29] = tx_data->final_state; // CRC 占位，暂时填 0 或者固定值，防止数组越界
     uint8_t checksum = 0;
     for (int i = 0; i < 30; i++) {
         checksum ^= tx_buf[i];

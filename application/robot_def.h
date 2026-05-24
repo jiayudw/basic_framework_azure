@@ -160,6 +160,7 @@ typedef struct
     float yaw;
     float pitch;
     float chassis_rotate_wz;
+    uint8_t final_state;
 
     gimbal_mode_e gimbal_mode;
 } Gimbal_Ctrl_Cmd_s;
@@ -208,6 +209,9 @@ typedef struct
     float speed_vx;
     float speed_vy;
     float speed_wz;
+    uint16_t last_time;
+    uint8_t gamestate;
+
 } Chassis_Upload_Data_s;
 
 
@@ -218,6 +222,7 @@ typedef struct
     float gimbal_relative_angle; // 云台相对底盘角度 [-180, 180]
     float yaw_motor_encoder_angle; // Yaw 电机编码器角度 [0, 360]
     float imu_yaw_total_angle;        // IMU 绝对 Yaw 角度 [0, 360]
+    uint8_t final_state;
 } Gimbal_Upload_Data_s;
 
 typedef struct

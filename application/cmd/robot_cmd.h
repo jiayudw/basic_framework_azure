@@ -13,6 +13,9 @@ void RobotCMDInit();
  * 
  */
 void RobotCMDTask();
+void RemoteControl(); // 遥控器控制
+void VisionControlSet(); // 视觉控制
+void RemoteCmd(); //最终状态判断
 
 // int16_t map_value(float value, float *ori_scope, float *target_scope);
 

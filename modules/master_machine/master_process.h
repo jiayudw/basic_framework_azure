@@ -113,7 +113,12 @@ typedef struct
 	uint8_t enemy_color; // 颜色
 	// uint8_t retreat_cmd;
 	// uint8_t avoid_cmd;
-	// uint8_t game_state;
+	uint8_t game_state;
+	uint16_t last_time;
+	uint16_t robot_HP;
+	uint8_t final_state; //最后一次决战控制状态
+
+
 } 
 Vision_Send_s;
 // typedef struct

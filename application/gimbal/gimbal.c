@@ -240,8 +240,10 @@ void GimbalTask()
     vision_send_data.yaw = gimbal_feedback_data.gimbal_imu_data.Yaw;   
     vision_send_data.roll = gimbal_feedback_data.gimbal_imu_data.Roll;
     vision_send_data.enemy_color = chassis_refe_data.enemy_color;
+    vision_send_data.game_state = chassis_refe_data.gamestate;
+    vision_send_data.robot_HP = chassis_refe_data.robot_HP;
+    vision_send_data.final_state = gimbal_cmd_recv.final_state; //乱写的
     // vision_send_data.chassis_angle = 0.0f;
-
     // vision_send_data.vx = chassis_refe_data.speed_vx;
     // vision_send_data.vy = chassis_refe_data.speed_vy;
     // vision_send_data.present_roll = chassis_refe_data.speed_wz;

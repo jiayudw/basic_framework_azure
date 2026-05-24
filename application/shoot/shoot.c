@@ -21,7 +21,9 @@ static Shoot_Upload_Data_s shoot_feedback_data; // 来自cmd的发射控制信�
 
 // dwt定时,计算冷却用
 static float hibernate_time = 0, dead_time = 0,last_time = 0;
-static uint8_t choose_mode = LOAD_REVERSE;
+static float time = 0 ,last_time_1 = 0 , time_sum = 0,time_err_over_last=0,time_err_over_sum = 0,reverse_time_sum=0,reverse_time_last=0;
+static bool reverse = 0 ,colding = 0, peak; // 标志位
+static uint8_t choose_mode = LOAD_STOP;
 
 
 void ShootInit()
@@ -219,11 +221,12 @@ void ShootTask()
         // 检查：确保 shoot_rate 不为 0
         // 如果 robot_cmd 没发具体的 shoot_rate，这里最好给个默认保底值
         float current_shoot_rate = 0;
-        if (current_shoot_rate == 0) {current_shoot_rate = 8;} // 默认8发/秒
+        if (current_shoot_rate == 0) {current_shoot_rate = 10;} // 默认8发/秒
         
         DJIMotorSetRef(loader, -current_shoot_rate * (360.0f/6.0f) * REDUCTION_RATIO_LOADER );
         reverse_trigger = 0; 
-       }   break;
+        break;
+    }   
     // 拨盘反转,对速度闭环,后续增加卡弹检测(通过裁判系统剩余热量反馈和电机电流)
     // 也有可能需要从switch-case中独立出来
     //   case LOAD_REVERSE:
@@ -273,8 +276,8 @@ void ShootTask()
         switch (shoot_cmd_recv.bullet_speed)
         {
         case SMALL_AMU_15:
-            DJIMotorSetRef(friction_l, -36000);
-            DJIMotorSetRef(friction_r, 36000);
+            DJIMotorSetRef(friction_l, -33000);
+            DJIMotorSetRef(friction_r, 33000);
             break;
         case SMALL_AMU_18:
             DJIMotorSetRef(friction_l, 36000);
@@ -313,27 +316,97 @@ void LimitShootPower(){
     // 1.获取热量相关：Buff,当前射击热量，当前射击限制
     float buffer_energy = shoot_heat_data.buffer_energy;//未知buff增益
     float shoot_heat = shoot_heat_data.shoot_heat;      //小弹丸热量
-    const float shoot_heat_limit = 300.0f; //热量限制
+    const float shoot_heat_limit = 260; //热量限制
     // //2.备用限制常数
     const float SCALE_SAFE       = 1.0f;   // 100% 输出
     const float SCALE_WARN       = 0.6f;   // 60%  输出
     const float SCALE_DANGER     = 0.4f;   // 40%  输出
     const float SCALE_EXTREME    = 0.2f;   // 20%  输出
-    if (shoot_heat_limit*0.9 < shoot_heat){
-        choose_mode = LOAD_REVERSE;
+
+    // 处理 colding
+    if (shoot_heat_limit*0.7 < shoot_heat)
+        colding=1;
+    else if(shoot_heat_limit*0.1 > shoot_heat && colding==1)
+        colding=0;
+
+    // 处理峰值累计时间 bug
+    if(loader->motor_controller.speed_PID.Err <=-15000)
+    {   
+        if (time_err_over_last==0) time_err_over_last=DWT_GetTimeline_ms();
+        time_err_over_sum+=DWT_GetTimeline_ms()-time_err_over_last;
+        time_err_over_last=DWT_GetTimeline_ms();
     }
-    else if(shoot_heat_limit*0.2 > shoot_heat ){
-        if(shoot_cmd_recv.shoot_mode == SHOOT_ON && last_time < 5){
-            choose_mode = LOAD_BURSTFIRE;
-            shoot_cmd_recv.friction_mode = FRICTION_ON;
-            shoot_cmd_recv.shoot_mode = SHOOT_ON;
-            shoot_cmd_recv.bullet_speed = SMALL_AMU_15;
-            last_time += 0.005;
-        }
-        else{
-            choose_mode = LOAD_REVERSE;
-            last_time = 0;
-        }
+    else
+    {   
+        time_err_over_sum=0;
+        time_err_over_last=0;
     }
 
+    // 处理reverse
+    if(time_err_over_sum>100)
+        reverse=1;
+
+    if(reverse_time_sum>500)
+        reverse=0;
+
+    // 处理reverse累计时间
+    if(reverse==1)
+    {   
+        if(reverse_time_last==0) reverse_time_last=DWT_GetTimeline_ms();
+        reverse_time_sum+=DWT_GetTimeline_ms()-reverse_time_last;
+        reverse_time_last=DWT_GetTimeline_ms();
+    }
+    else
+    {
+        reverse_time_sum=0;
+        reverse_time_last=0;
+    }
+        
+
+    if(colding == 0 && reverse==0 && shoot_cmd_recv.shoot_mode == SHOOT_ON && shoot_cmd_recv.load_mode == LOAD_BURSTFIRE)
+    {
+        choose_mode = LOAD_BURSTFIRE;
+        shoot_cmd_recv.shoot_mode = SHOOT_ON;
+        shoot_cmd_recv.bullet_speed = SMALL_AMU_15;
+    }
+    else if(colding == 0 && reverse==1 && shoot_cmd_recv.shoot_mode == SHOOT_ON && shoot_cmd_recv.load_mode == LOAD_BURSTFIRE)
+    {
+        choose_mode = LOAD_REVERSE;
+    }
+    else
+    {
+        choose_mode = LOAD_STOP;
+    }
+
+
+
+
+    // if(colding == 0){
+    //     if(shoot_cmd_recv.shoot_mode == SHOOT_ON && shoot_cmd_recv.load_mode == LOAD_BURSTFIRE){
+    //         if (time_sum > 0.5) {reverse_time_sum = 0;}
+    //         if (reverse == 1){
+    //         choose_mode = LOAD_REVERSE;
+    //         time = DWT_GetTimeline_ms() - last_time_1;
+    //         last_time_1 = DWT_GetTimeline_ms();
+    //         time_sum += time;
+    //         return;
+    //         }
+    //         time_sum = 0; 
+    //         choose_mode = LOAD_BURSTFIRE;
+    //         // shoot_cmd_recv.friction_mode = FRICTION_ON;
+    //         shoot_cmd_recv.shoot_mode = SHOOT_ON;
+    //         shoot_cmd_recv.bullet_speed = SMALL_AMU_15;
+    //     }
+    //     else
+    //     {
+    //         choose_mode = LOAD_STOP;
+    //         last_time = 0;
+    //         time_sum = 0;
+    //     }
+    // }
+    // else if(colding == 1){
+    //         choose_mode = LOAD_STOP;
+    //         last_time = 0;
+    //         time_sum = 0;
+    // }    
 }
